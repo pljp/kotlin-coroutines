@@ -23,11 +23,11 @@
 ## 目次
 
 * [ユースケース](#use-cases)
-    * [非同期計算](#asynchronous-computations)
-    * [Futures](#futures)
-    * [ジェネレーター](#generators)
-    * [非同期UI](#asynchronous-ui)
-    * [その他のユースケース](#more-use-cases)
+  * [ 非同期計算](#asynchronous-computations)
+  * [Futures](#futures)
+  * [ ジェネレーター](#generators)
+  * [ 非同期UI](#asynchronous-ui)
+  * [ その他のユースケース](#more-use-cases)
 * [コルーチンの概要](#coroutines-overview)
   * [コルーチンの実験状況](#experimental-status-of-coroutines)
   * [用語](#terminology)
