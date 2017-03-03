@@ -1,170 +1,154 @@
-# Coroutines for Kotlin (Revision 3.2)
+# Kotlinのコルーチン (Revision 3.2)
 
 * **Type**: Informal description
 * **Author**: Andrey Breslav
 * **Contributors**: Vladimir Reshetnikov, Stanislav Erokhin, Ilya Ryzhenkov, Denis Zharkov, Roman Elizarov
 * **Status**: Implemented in Kotlin 1.1.0
 
-## Abstract
+##要約
 
-This is a description of coroutines in Kotlin. This concept is also known as, or partly covers
+これはKotlinのコルーチンの説明です。 This concept is also known as, or partly covers
 
-- generators/yield
+- ジェネレーター/yield
 - async/await
-- composable/delimited сontinuations
+- 構成可能/区切りの継続
 
-Goals:
+ゴール：
 
-- No dependency on a particular implementation of Futures or other such rich library;
-- Cover equally the "async/await" use case and "generator blocks";
-- Make it possible to utilize Kotlin coroutines as wrappers for different existing asynchronous APIs 
-  (such as Java NIO, different implementations of Futures, etc).
+- Futureなどのリッチなライブラリの特定の実装に依存しない。
+- "async/await"ユースケースと "ジェネレータブロック"を等しくカバーする。
+- 異なる既存の非同期APIのラッパーとしてKotlinコルーチンを利用できるようにする
+  （Java NIO、Futureのさまざまな実装など）。
 
-## Table of Contents
+## 目次
 
-* [Use cases](#use-cases)
-  * [Asynchronous computations](#asynchronous-computations)
-  * [Futures](#futures)
-  * [Generators](#generators)
-  * [Asynchronous UI](#asynchronous-ui)
-  * [More use cases](#more-use-cases)
-* [Coroutines overview](#coroutines-overview)
-  * [Experimental status of coroutines](#experimental-status-of-coroutines)
-  * [Terminology](#terminology)
-  * [Continuation interface](#continuation-interface)
-  * [Suspending functions](#suspending-functions)
-  * [Coroutine builders](#coroutine-builders)
-  * [Coroutine context](#coroutine-context)
-  * [Continuation interceptor](#continuation-interceptor)
-  * [Restricted suspension](#restricted-suspension)
-* [More examples](#more-examples)
-  * [Wrapping callbacks](#wrapping-callbacks)
-  * [Building futures](#building-futures)
-  * [Non-blocking sleep](#non-blocking-sleep)
-  * [Cooperative single-thread multitasking](#cooperative-single-thread-multitasking)
-  * [Asynchronous sequences](#asynchronous-sequences)
-  * [Channels](#channels)
-  * [Mutexes](#mutexes)
-* [Advanced topics](#advanced-topics)
-  * [Resource management and GC](#resource-management-and-gc)
-  * [Concurrency and threads](#concurrency-and-threads)
-  * [Asynchronous programming styles](#asynchronous-programming-styles)
-* [Implementation details](#implementation-details)
-  * [Continuation passing style](#continuation-passing-style)
-  * [State machines](#state-machines)
-  * [Compiling suspending functions](#compiling-suspending-functions)
-  * [Coroutine intrinsics](#coroutine-intrinsics)
-* [Revision history](#revision-history)
+* [ユースケース](#use-cases)
+  * [非同期計算](#asynchronous-computations)
+  * [Futures](#futures)
+  * [ジェネレーター](#generators)
+  * [非同期UI](#asynchronous-ui)
+  * [その他のユースケース](#more-use-cases)
+* [コルーチンの概要](#coroutines-overview)
+  * [コルーチンの実験状況](#experimental-status-of-coroutines)
+  * [用語](#terminology)
+  * [継続インタフェース](#continuation-interface)
+  * [サスペンド関数](#suspending-functions)
+  * [コルーチンビルダー](#coroutine-builders)
+  * [コルーチンのコンテキスト](#coroutine-context)
+  * [継続インターセプタ](#continuation-interceptor)
+  * [制限付きサスペンド](#restricted-suspension)
+* [その他の例](#more-examples)
+  * [コールバックのラッピング](#wrapping-callbacks)
+  * [futureの作成](#building-futures)
+  * [ノンブロッキングスリープ](#non-blocking-sleep)
+  * [協調シングルスレッドマルチタスキング](#cooperative-single-thread-multitasking)
+  * [非同期シーケンス](#cooperative-single-thread-multitasking)
+  * [チャネル](#channels)
+  * [ミューテックス](#mutexes)
+* [詳細トピック](#advanced-topics)
+  * [リソース管理とGC](#resource-management-and-gc)
+  * [並行処理とスレッド](#concurrency-and-threads)
+  * [非同期プログラミングスタイル](#asynchronous-programming-styles)
+* [実装の詳細](#implementation-details)
+  * [Continuation passing style](#continuation-passing-style)
+  * [状態マシン](#state-machines)
+  * [中断機能のコンパイル](#compiling-suspending-functions)
+  * [Coroutine intrinsics](#coroutine-intrinsics)
+* [改訂履歴](#revision-history)
   * [Changes in revision 3.2](#changes-in-revision-32)
   * [Changes in revision 3.1](#changes-in-revision-31)
   * [Changes in revision 3](#changes-in-revision-3)
   * [Changes in revision 2](#changes-in-revision-2)
 
-## Use cases
+## ユースケース
 
-A coroutine can be thought of as an instance of _suspendable computation_, i.e. the one that can suspend at some 
-points and later resume execution possibly on another thread. Coroutines calling each other 
-(and passing data back and forth) can form 
-the machinery for cooperative multitasking.
- 
-### Asynchronous computations 
- 
-The first class of motivating use cases for coroutines are asynchronous computations 
-(handled by async/await in C# and other languages). 
-Let's take a look at how such computations are done with callbacks. As an inspiration, let's take 
-asynchronous I/O (the APIs below are simplified):
+コルーチンは_中断可能な計算_のインスタンスとして考えることができます。ある時点で中断し、後で別のスレッドで実行を再開することができます。
+コルーチンはお互いを呼び出す（そしてデータを前後に渡す）ことで、協力的なマルチタスキングのための機構を形成することができます。
+
+### 非同期計算
+
+コルーチンの動機付けの最初のクラスは、非同期計算です（C#やその他の言語ではasync/awaitで処理されます）。
+そのような計算がコールバックでどのように行われるかを見てみましょう。 インスピレーションとして、非同期I/O（以下のAPIは簡略化されています）を取ります:
 
 ```kotlin
-// asynchronously read into `buf`, and when done run the lambda
+// 非同期に `buf`を読み込み、完了したらラムダを実行
 inChannel.read(buf) {
-    // this lambda is executed when the reading completes
+    // このラムダは読み込みが完了したときに実行される
     bytesRead ->
     ...
     ...
     process(buf, bytesRead)
-    
-    // asynchronously write from `buf`, and when done run the lambda
+
+    // `buf`から非同期的に書き込み、完了したらラムダを実行
     outChannel.write(buf) {
-        // this lambda is executed when the writing completes
+        // このラムダは、書き込みが完了したときに実行される
         ...
         ...
-        outFile.close()          
+        outFile.close()
     }
 }
 ```
 
-Note that we have a callback inside a callback here, and while it saves us from a lot of boilerplate (e.g. there's no 
-need to pass the `buf` parameter explicitly to callbacks, they just see it as a part of their closure), the indentation
-levels are growing every time, and one can easily anticipate the problems that may come at nesting levels greater 
-than one (google for "callback hell" to see how much people suffer from this in JavaScript).
+ここではコールバック内にコールバックがあり、多くの定型文から私たちを救っていることに注意してください（コールバックに `buf`パラメータを明示的に渡す必要はありません）。
+インデントレベルは毎回増加しています。1つ以上のネストレベルで発生する可能性のある問題を簡単に予測することができます（JavaScriptでこれでどれくらいの人が苦しんでいるかを知るために「コールバック地獄」についてググってください）。
 
-This same computation can be expressed straightforwardly as a coroutine (provided that there's a library that adapts
-the I/O APIs to coroutine requirements):
- 
+これと同じ計算はコルーチンとして直接的に表現できます（I/O APIをコルーチンの要件に適合させたライブラリがあれば）:
+
 ```kotlin
 launch(CommonPool) {
-    // suspend while asynchronously reading
-    val bytesRead = inChannel.aRead(buf) 
-    // we only get to this line when reading completes
+    // 非同期で読み込んでいる間サスペンドする
+    val bytesRead = inChannel.aRead(buf)
+    // 読み込みが完了したときだけこの行に行く
     ...
     ...
     process(buf, bytesRead)
-    // suspend while asynchronously writing   
+    // 非同期で書き込んでいる間サスペンドする
     outChannel.aWrite(buf)
-    // we only get to this line when writing completes  
+    // 書き込みが完了したときだけこの行に行く
     ...
     ...
     outFile.close()
 }
 ```
 
-The `aRead()` and `aWrite()` here are special _suspending functions_ — they _suspend_ execution 
-(which does not mean blocking the thread it has been running on) and _resume_ when the call has completed. 
-If we squint our eyes just enough to imagine that all the code after `aRead()` has been wrapped in a 
-lambda and passed to `aRead()` as a callback, and the same has been done for `aWrite()`, 
-we can see that this code is the same as above, only more readable. 
+ここでの `aRead()`と `aWrite()`は特別な_サスペンド関数_です。実行を_サスペンド_し、呼び出しが完了すると_リジューム_します。
+`aRead()`の後のすべてのコードがラムダでラップされ、コールバックとして `aRead()`に渡され、 `aWrite()`に対して同じことが行われたと想像するだけで、 私たちはこのコードが上記と同じで、より読み易いことが分かります。
 
-It is our explicit goal to support coroutines in a very generic way, so in this example,
- `launch{}`, `.aRead()`, and `.aWrite()` are just **library functions** geared for
-working with coroutines: `launch` is the _coroutine builder_ — it builds and launches coroutine
-in some context (a `CommonPool` context is used in the example), while `aRead`/`aWrite` are special
-_suspending functions_ which implicitly receive 
-_continuations_ (continuations are just generic callbacks).  
+これはコルーチンを非常に一般的な方法でサポートするという私たちの明白な目標です。この例では、 `launch {}`、 `.aRead（）`、 `.aWrite（）`は単にコルーチンを扱う**ライブラリ関数です**:
+`aRead`/`aWrite`は暗黙的に_継続_(単なる一般的なコールバック)を受け取る特殊な_サスペンド関数_ですが、`launch`(_コルーチンのビルダー_)はコルーチンをコンテキストの中で(この例では `CommonPool`コンテキストが使用されています)でビルドして起動します。
 
-> The library code for `launch{}` is shown in [coroutine builders](#coroutine-builders) section, and
-the library code for `.aRead()` is shown in [wrapping callbacks](#wrapping-callbacks) section.
+> `launch {}`のライブラリコードは[コルーチンビルダー](#coroutine-builder)セクションに、 `.aRead()`のライブラリコードは[コールバックのラッピング](#wrapping-callbacks)セクションに示されています。
 
-Note, that with explicitly passed callbacks having an asynchronous call in the middle of a loop can be tricky, 
-but in a coroutine it is a perfectly normal thing to have:
+明示的に渡されたコールバックでは、ループの途中で非同期呼び出しを行うことは難しいかもしれませんが、コルーチンでは完全に普通のことです:
 
 ```kotlin
 launch(CommonPool) {
     while (true) {
-        // suspend while asynchronously reading
+        // 読み込んでいる間サスペンドする
         val bytesRead = inFile.aRead(buf)
-        // continue when the reading is done
+        // 読み込みが終わったら続ける
         if (bytesRead == -1) break
         ...
         process(buf, bytesRead)
-        // suspend while asynchronously writing
-        outFile.aWrite(buf) 
-        // continue when the writing is done
+        // 書き込んでいる間サスペンドする
+        outFile.aWrite(buf)
+        // 書き込みが終わったら続ける
         ...
     }
 }
 ```
 
-One can imagine that handling exceptions is also a bit more convenient in a coroutine.
+コルーチンで例外を処理することはもう少し便利だと想像できるでしょう。
 
 ### Futures
 
-There's another style of expressing asynchronous computations: through futures (and their close relatives — promises).
-We'll use an imaginary API here, to apply an overlay to an image:
+非同期計算を表現する別のスタイルがあります: through futures（そして近い関係のpromise）。
+画像にオーバーレイを適用するために、ここでは架空のAPIを使用します。
 
 ```kotlin
 val future = runAfterBoth(
-    asyncLoadImage("...original..."), // creates a Future 
-    asyncLoadImage("...overlay...")   // creates a Future
+    asyncLoadImage("...original..."), // Futureを作る
+    asyncLoadImage("...overlay...")   // Futureを作る
 ) {
     original, overlay ->
     ...
@@ -172,40 +156,37 @@ val future = runAfterBoth(
 }
 ```
 
-With coroutines, this could be rewritten as
+コルーチンでは、これは次のように書き直すことができます。
 
 ```kotlin
 val future = future {
-    val original = asyncLoadImage("...original...") // creates a Future
-    val overlay = asyncLoadImage("...overlay...")   // creates a Future
+    val original = asyncLoadImage("...original...") // Futureを作る
+    val overlay = asyncLoadImage("...overlay...")   // Futureを作る
     ...
-    // suspend while awaiting the loading of the images
-    // then run `applyOverlay(...)` when they are both loaded
+    // 画像の読み込みを待つ間中断し、両方が読み込まれたときに
+    // `applyOverlay(...)`を実行する
     applyOverlay(original.await(), overlay.await())
 }
 ```
 
-> The library code for `future{}` is shown in [building futures](#building-futures) section, and
-the library code for `.await()` is shown in [suspending functions](#suspending-functions) section.
+> `future{}`のライブラリコードは[futureの作成](#building-futures)セクションに、 `.await()`のライブラリコードは[サスペンド関数](#suspending-functions)に示されています。
 
-Again, less indentation and more natural composition logic (and exception handling, not shown here), 
-and no special keywords (like `async` and `await` in C#, JS and other languages)
-to support futures: `future{}` and `.await()` are just functions in a library.
+繰り返しますが、字下げが少なく自然な構成ロジック(ここでは示しませんが例外処理も)で、futureをサポートするための特別なキーワード(C#, JSなどの言語での`async`や`await`のような)もありません。
+`future{}`や`.await()`はただのライブラリ関数です。
 
-### Generators
+### ジェネレーター
 
-Another typical use case for coroutines would be lazily computed sequences (handled by `yield` in C#, Python 
-and many other languages). Such a sequence can be generated by seemingly sequential code, but at runtime only 
-requested elements are computed:
+コルーチンの別の典型的な使用例は、遅延計算シーケンス(C#、Python、その他多くの言語で`yield`によって処理される)です。
+このようなシーケンスは、一見するとシーケンシャルなコードで生成できますが、実行時には要求された要素のみが計算されます。
 
 ```kotlin
-// inferred type is Sequence<Int>
+// 推定される型はSequence<Int>
 val fibonacci = buildSequence {
-    yield(1) // first Fibonacci number
+    yield(1) // 最初のフィボナッチ数
     var cur = 1
     var next = 1
     while (true) {
-        yield(next) // next Fibonacci number
+        yield(next) // 次のフィボナッチ数
         val tmp = cur + next
         cur = next
         next = tmp
@@ -213,108 +194,94 @@ val fibonacci = buildSequence {
 }
 ```
 
-This code creates a lazy `Sequence` of [Fibonacci numbers](https://en.wikipedia.org/wiki/Fibonacci_number), 
-that is potentially infinite 
-(exactly like [Haskel's infinite lists](http://www.techrepublic.com/article/infinite-list-tricks-in-haskell/)). 
-We can request some of it, for example, through `take()`:
- 
+このコードは、潜在的に無限にある[フィボナッチ数](https://en.wikipedia.org/wiki/Fibonacci_number)の遅延`シーケンス`を作成します([Haskelの無限リスト](http://www.techrepublic.com/article/infinite-list-tricks-in-haskell/)のような)。
+たとえば、`take()`を使ってその一部を要求することができます。
+
 ```kotlin
 println(fibonacci.take(10).joinToString())
 ```
 
-> This will print `1, 1, 2, 3, 5, 8, 13, 21, 34, 55`
-  You can try this code [here](examples/sequence/fibonacci.kt)
- 
-The strength of generators is in supporting arbitrary control flow, such as `while` (from the example above),
-`if`, `try`/`catch`/`finally` and everything else: 
- 
+> これは`1, 1, 2, 3, 5, 8, 13, 21, 34, 55`をプリントします。
+  [ここ](examples/sequence/fibonacci.kt)でこのコードを試すことができます。
+
+ジェネレータの長所は、`while`(上記の例から)、`if`、`try`/`catch`/`finally`などの任意の制御フローをサポートしているところです。
+
 ```kotlin
 val seq = buildSequence {
-    yield(firstItem) // suspension point
+    yield(firstItem) // 中断ポイント
 
     for (item in input) {
-        if (!item.isValid()) break // don't generate any more items
+        if (!item.isValid()) break // これ以上アイテムを生成しない
         val foo = item.toFoo()
         if (!foo.isGood()) continue
-        yield(foo) // suspension point        
+        yield(foo) // 中断ポイント
     }
-    
+
     try {
-        yield(lastItem()) // suspension point
+        yield(lastItem()) // 中断ポイント
     }
     finally {
-        // some finalization code
-    }
-} 
-```
-
-> The library code for `buildSequence{}` and `yield()` is shown in
-[restricted suspension](#restricted-suspension) section.
-
-Note that this approach also allows to express `yieldAll(sequence)` as a library function 
-(as well as `buildSequence{}` and `yield()` are), which simplifies joining lazy sequences and allows
-for efficient implementation.
-
-### Asynchronous UI
-
-A typical UI application has a single event dispatch thread where all UI operations happen. 
-Modification of UI state from other threads is usually not allowed. All UI libraries provide
-some kind of primitive to move execution back to UI thread. Swing, for example, has 
-[`SwingUtilities.invokeLater`](https://docs.oracle.com/javase/8/docs/api/javax/swing/SwingUtilities.html#invokeLater-java.lang.Runnable-),
-JavaFX has 
-[`Platform.runLater`](https://docs.oracle.com/javase/8/javafx/api/javafx/application/Platform.html#runLater-java.lang.Runnable-), 
-Android has
-[`Activity.runOnUiThread`](https://developer.android.com/reference/android/app/Activity.html#runOnUiThread(java.lang.Runnable)),
-etc.
-Here is a snippet of code from a typical Swing application that does some asynchronous
-operation and then displays its result in the UI:
-
-```kotlin
-makeAsyncRequest {
-    // this lambda is executed when the async request completes
-    result, exception ->
-    
-    if (exception == null) {
-        // display result in UI
-        SwingUtilities.invokeLater {
-            display(result)   
-        }
-    } else {
-       // process exception
+        // 何らかの終了コード
     }
 }
 ```
 
-This is similar to callback hell that we've seen in [asynchronous computations](#asynchronous-computations) use case
-and it is elegantly solved by coroutines, too:
- 
+> `buildSequence{}`と `yield()`のライブラリコードは、
+[制限付きサスペンド](#restricted-suspension)のセクションに示されています。
+
+この方法では、ライブラリ関数(`buildSequence{}`と `yield()`も同様)で `yieldAll(sequence)` と表現することもできます。これは、遅延配列の結合を簡単にし、効率的な実装を可能にします。
+
+### 非同期UI
+
+一般的なUIアプリケーションには、すべてのUI操作が発生する単一のイベントディスパッチスレッドがあります。
+他のスレッドからのUI状態の変更は通常許可されません。すべてのUIライブラリは、実行をUIスレッドに戻すためのプリミティブを提供します。たとえばSwingには [`SwingUtilities.invokeLater`](https://docs.oracle.com/javase/8/docs/api/javax/swing/SwingUtilities.html#invokeLater-java.lang.Runnable-)、JavaFXには [`Platform.runLater`](https://docs.oracle.com/javase/8/javafx/api/javafx/application/Platform.html#runLater-java.lang.Runnable-)、Androidには [`Activity.runOnUiThread`](https://developer.android.com/reference/android/app/Activity.html#runOnUiThread(java.lang.Runnable))など。
+ここでは、いくつかの非同期操作を行い、その結果をUIに表示する典型的なSwingアプリケーションのコードスニペットを示します。
+
+```kotlin
+makeAsyncRequest {
+    // このラムダは、非同期要求が完了したときに実行される
+    result, exception ->
+
+    if (exception == null) {
+        // 結果をUIに表示
+        SwingUtilities.invokeLater {
+            display(result)
+        }
+    } else {
+       // 例外処理
+    }
+}
+```
+
+これは、[非同期計算](#asynchronous-computations)ユースケースのコールバック地獄に似ていますが、これもコルーチンによってエレガントに解決されています。
+
 ```kotlin
 launch(Swing) {
     try {
-        // suspend while asynchronously making request
+        // 非同期でリクエストを作成している間中断する
         val result = makeRequest()
-        // display result in UI, here Swing context ensures that we always stay in event dispatch thread
+        // 結果をUIに表示する、ここではSwingコンテキストは常にイベントディスパッチスレッドに留まることを保証する
         display(result)
     } catch (exception: Throwable) {
         // process exception
     }
 }
 ```
- 
-> The library code for `Swing` context is shown in the [continuation interceptor](#continuation-interceptor) section.
- 
-All exception handling is performed using natural language constructs. 
 
-### More use cases
- 
-Coroutines can cover many more use cases, including these:  
- 
-* Channel-based concurrency (aka goroutines and channels);
-* Actor-based concurrency;
-* Background processes occasionally requiring user interaction, e.g., show a modal dialog;
-* Communication protocols: implement each actor as a sequence rather than a state machine;
-* Web application workflows: register a user, validate email, log them in 
-(a suspended coroutine may be serialized and stored in a DB).
+> `Swing`コンテキストのライブラリコードは[継続インターセプタ](#continuation-interceptor)セクションに示されています。
+
+すべての例外処理は、自然な言語構造を使用して実行されます。
+
+### その他のユースケース
+
+コルーチンは、次のような多くのユースケースをカバーできます。
+
+* チャネルベースの同時実行性（goroutinesとチャネルとも呼ばれます）
+* アクターベースの同時実行性
+* ユーザとの対話を必要とするバックグラウンドプロセス。たとえば、モーダルダイアログの表示
+* 通信プロトコル: 各アクターを状態マシンではなくシーケンスとして実装する
+* Webアプリケーションのワークフロー: ユーザーの登録、電子メールのバリデーション、ログイン
+(サスペンドされたコルーチンを直列化してDBに格納することができます)
 
 ## Coroutines overview
 
