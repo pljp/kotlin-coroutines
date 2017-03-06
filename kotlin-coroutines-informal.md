@@ -22,8 +22,8 @@
 
 ## 目次
 
-* [ユースケース](#use-cases)
-  * [非同期計算](#asynchronous-computations)
+* [ユースケース](#ユースケース)
+  * [非同期計算](#非同期計算)
   * [Futures](#futures)
   * [ジェネレーター](#generators)
   * [非同期UI](#asynchronous-ui)
