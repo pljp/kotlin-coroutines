@@ -29,7 +29,7 @@
   * [非同期UI](#非同期UI)
   * [その他のユースケース](#その他のユースケース)
 * [コルーチンの概要](#コルーチンの概要)
-  * [コルーチンの実験状況](#コルーチンの実験状況)
+  * [コルーチンの実験的状態](#コルーチンの実験的状態)
   * [用語](#用語)
   * [継続インタフェース](#継続インタフェース)
   * [サスペンド関数](#サスペンド関数)
@@ -285,81 +285,49 @@ launch(Swing) {
 
 ## コルーチンの概要
 
-This section gives an overview of the language mechanisms that enable writing coroutines and 
-the standard libraries that govern their semantics.
 このセクションでは、コルーチンとそのセマンティクスを制御する標準ライブラリを記述するための言語メカニズムの概要を説明します。
 
-### Experimental status of coroutines コルーチンの実験的状態
+### コルーチンの実験的状態
 
-Coroutines are experimental in Kotlin 1.1, because we expect the design to change.
-Kotlin compiler produces a warning on usage of coroutine-related features. There is an opt-in switch 
-`-Xcoroutines=enable` that removes the warning. 
-コルーチンはKotlin 1.1で実験的です。なぜなら、我々は設計が変わることを期待しているからです。Kotlinコンパイラは、コルーチン関連の機能の使用に関する警告を生成します。-Xcoroutines=enable警告を取り除くオプトインスイッチがあります 。
+コルーチンはKotlin 1.1で実験的です。なぜなら、我々は設計が変わることを想定しているからです。Kotlinコンパイラは、コルーチン関連の機能の使用に関する警告を出します。警告を取り除く `-Xcoroutines=enable` オプトインスイッチがあります 。
 
-All the APIs related to coroutines in kotlin-stdlib ship in a package named `kotlin.coroutines.experimental`.
-When the final design is ready, it will be published under `kotlin.coroutines`, 
-while the experimental package will stay for a while, so that the old binaries will be compatible and continue to work.
-kotlin-stdlibのコルーチンに関連するすべてのAPIは、パッケージに入っていますkotlin.coroutines.experimental。最終的なデザインが完成すると、それはkotlin.coroutines公開されますが、実験的なパッケージはしばらくの間留まるので、古いバイナリは互換性があり作業を続けます。
+kotlin-stdlibのコルーチンに関連するすべてのAPIは、`kotlin.coroutines.experimental` パッケージに入っています。最終的な設計では、`kotlin.coroutines' パッケージで公開されますが、実験的なパッケージはしばらくの間そのままなので、古いバイナリは互換性があり作業を続けられます。
 
-Every library that uses coroutines in its public API should do the same,  
-so if you are writing a library that it here to stay and you care about the users of your future versions, 
-you will also need to name your package something like `org.my.library.experimental`. 
-And when the final design of coroutines comes, drop the `experimental` suffix from the main API, 
-but keep the old package around for those of your users who might need it for binary compatibility.
-共通APIでコルーチンを使用するすべてのライブラリで同じことを行う必要があります。したがって、
-ここにあるライブラリを作成しておき、将来のバージョンのユーザーを気にする場合は、パッケージに名前を付ける必要がありorg.my.library.experimentalます。そして、コルーチンの最終的な設計が来たらexperimental、メインAPIからサフィックスを削除しますが、バイナリ互換性のために必要なあなたのユーザーのために古いパッケージを残しておきます。
+パブリックAPIでコルーチンを使用するすべてのライブラリで同じことを行う必要があります。したがって、ここでライブラリを作成しておき、将来のバージョンのユーザーを気にかける場合は、パッケージに `org.my.library.experimental` のような名前を付ける必要があります 。
+そして、コルーチンの最終的な設計が来たら、メインAPIから `experimental` サフィックスを削除しますが、バイナリ互換性が必要なユーザーのために古いパッケージを残しておきます。
 
-> More details can be found in 
-  [this](https://discuss.kotlinlang.org/t/experimental-status-of-coroutines-in-1-1-and-related-compatibility-concerns/2236) 
-  forum post 
-詳細は、この フォーラムのポストで見つけることができます
+> 詳細は、[この](https://discuss.kotlinlang.org/t/experimental-status-of-coroutines-in-1-1-and-related-compatibility-concerns/2236) フォーラムの投稿で見つけることができます
 
-### Terminology 用語
+### 用語
 
-* A _coroutine_ — is an _instance_ of _suspendable computation_. It is conceptually similar to a thread, in the sense that
-it takes a block of code to run and has a similar life-cycle — it is _created_ and _started_, but it is not bound
-to any particular thread. It may _suspend_ its execution in one thread and _resume_ in another one. 
-Moreover, like a future or promise, it may _complete_ with some result or exception.
-* コルーチンは -であるインスタンスの懸濁計算。それが実行するコードのブロックを受け取り、同様のライフサイクルを持っている意味では、スレッドに概念的に似ている-それはされて作成し、開始しますが、それは、任意の特定のスレッドにバインドされていません。それはありサスペンド 1つのスレッドで実行をし、再開し、別の1に。また、将来または約束のように、それはあり完了し、いくつかの結果や例外を除いて。
+* _コルーチン_ - _中断可能な計算_の_インスタンス_です。
+  概念的にはスレッドに似ていて、実行するコードブロックを持ち、同様のライフサイクルを持ち、_作成_され_起動_されますが、特定のスレッドに束縛されていません。あるスレッドで実行を_中断_し、別のスレッドで_再開_することがあります。
+  さらに、futureやpromiseのように、何らかの結果や例外で_完了_します。
  
-* A _suspending function_ — a function that is marked with `suspend` modifier. It may _suspend_ execution of the code
-  without blocking the current thread of execution by invoking other suspending functions. A suspending function 
-  cannot be invoked from a regular code, but only from other suspending functions and from suspending lambdas (see below).
-  For example, `.await()` and `yield()`, as shown in [use cases](#use-cases), are suspending functions that may
-  be defined in a library. The standard library provides primitive suspending functions that are used to define 
-  all other suspending functions.
-* サスペンド機能 -でマークされた関数suspend修飾子。他の中断機能を呼び出すことによって、現在の実行スレッドをブロックせずにコードの実行を中断することができます。一時停止機能は、通常のコードから呼び出すことはできませんが、他の一時停止機能やラムダを一時停止することによってのみ呼び出すことができます（下記参照）。例えば、.await()とyield()のように、ユースケース、ライブラリ内で定義することができる機能を一時停止しています。標準ライブラリは、他のすべての中断関数を定義するために使用されるプリミティブな中断関数を提供します。
-  
-* A _suspending lambda_ — a block of code that can be run in a coroutine.
-  It looks exactly like an ordinary [lambda expression](https://kotlinlang.org/docs/reference/lambdas.html)
-  but its functional type is marked with `suspend` modifier.
-  Just like a regular lambda expression is a short syntactic form for an anonymous local function,
-  a suspending lambda is a short syntactic form for an anonymous suspending function. It may _suspend_ execution of
-  the code without blocking the current thread of execution by invoking suspending functions.
-  For example, blocks of code in curly braces following `launch`, `future`, and `buildSequence` functions,
-  as shown in [use cases](#use-cases), are suspending lambdas.
-* 懸濁ラムダ -コルーチンで実行できるコードのブロック。通常のラムダ式と全く同じように見えますが、 その関数型はsuspend修飾子でマークされています。通常のラムダ式と同様に、匿名のローカル関数用の短い構文形式です。恒久ラムダは、匿名のサスペンド関数用の短い構文形式です。それはありサスペンドサスペンド機能を呼び出すことで、現在の実行スレッドをブロックせずにコードの実行を。例えば、中括弧内のコードのブロックは、以下のlaunch、future、およびbuildSequenceに示すように機能し、ユースケース、懸濁ラムダがあります。
+* _サスペンド関数_ - `suspend` 修飾子でマークされた関数。
+  他のサスペンド関数を呼び出すことによって、現在の実行スレッドをブロックせずにコードの実行を_中断_することができます。
+  サスペンド関数は、通常のコードから呼び出すことはできませんが、他のサスペンド関数やサスペンドラムダからのみ呼び出すことができます（下記参照）。
+  例えば、 [ユースケース](#ユースケース)で示されている `.await()` や `yield()` は、ライブラリに定義されているサスペンド関数です。
+  標準ライブラリは、他のすべてのサスペンド関数を定義するために使用されるプリミティブなサスペンド関数を提供します。
 
-> Note: Suspending lambdas may invoke suspending functions in all places of their code where a 
-  [non-local](https://kotlinlang.org/docs/reference/returns.html) `return` statement
-  from this lambda is allowed. That is, suspending function calls inside inline lambdas 
-  like [`apply{}` block](https://kotlinlang.org/api/latest/jvm/stdlib/kotlin/apply.html) are allowed,
-  but not in the `noinline` nor in `crossinline` inner lambda expressions. 
-  A _suspension_ is treated as a special kind of non-local control transfer.
-注意：ラムダを一時停止すると、このラムダの非ローカル return文が許可されているコードのすべての場所で 一時停止関数が呼び出される可能性があります。それは次のようにインラインラムダの内部関数呼び出しを懸濁し、あるapply{}ブロックがなく、中に、許可されていnoinlineたりでcrossinline、内側ラムダ式。懸濁液は、非局所制御転送の特別な種類として扱われます。
+* _サスペンドラムダ_ - コルーチンで実行できるコードブロック。
+  通常の[ラムダ式](http://dogwood008.github.io/kotlin-web-site-ja/docs/reference/lambdas.html)と全く同じように見えますが、 その関数型は `suspend` 修飾子でマークされています。
+  通常のラムダ式と同様に、匿名のローカル関数用の短い構文形式です。サスペンドラムダは、匿名のサスペンド関数の短い構文形式です。
+  サスペンド関数を呼び出すことによって、現在の実行スレッドをブロックせずにコードの実行を_中断_することができます。
+  例えば、 [ユースケース](#ユースケース)で示されている `launch`、` future`、`buildSequence` 関数に続く中括弧で囲まれたコードブロックは、サスペンドラムダです。
 
-* A _suspending function type_ — is a function type for suspending functions and lambdas. It is just like 
-  a regular [function type](https://kotlinlang.org/docs/reference/lambdas.html#function-types), 
-  but with `suspend` modifier. For example, `suspend () -> Int` is a type of suspending
-  function without arguments that returns `Int`. A suspending function that is declared like `suspend fun foo(): Int`
-  conforms to this function type.
-* サスペンド機能のタイプは -関数とラムダを吊り下げるための関数型です。通常の関数型と似ていますが、suspend修飾子付きです。例えば、suspend () -> Int引数を持たない一時停止関数の一種ですInt。同様に宣言された一時停止関数はsuspend fun foo(): Int 、この関数型に準拠しています。
+> 注意 : サスペンドラムダは、このラムダの[非ローカル](http://dogwood008.github.io/kotlin-web-site-ja/docs/reference/returns.html) `return` 文が許可されているコードのすべての場所でサスペンド関数を呼び出せます。
+  つまり、 [`apply{}` ブロック](https://kotlinlang.org/api/latest/jvm/stdlib/kotlin/apply.html) のようなインラインラムダの中で関数呼び出しを中断することは許されますが、 `noinline` や `crossinline` の内部ラムダ式では許可されません。
+   _中断_は特別な種類の非ローカル制御転送として扱われます。
 
-* A _coroutine builder_ — a function that takes some _suspending lambda_ as an argument, creates a coroutine,
-  and, optionally, gives access to its result in some form. For example, `launch{}`, `future{}`,
-  and `buildSequence{}` as shown in [use cases](#use-cases), are coroutine builders defined in a library.
-  The standard library provides primitive coroutine builders that are used to define all other coroutine builders.
-コルーチンビルダー -いくつかのとる関数の懸濁ラムダ引数としては、必要に応じて、コルーチンを作成し、そして、何らかの形でその結果にアクセスすることができます。例えば、launch{}、future{}、およびbuildSequence{}のように使用する場合、ライブラリに定義されたコルーチンビルダーです。標準ライブラリには、他のすべてのコルーチン構築ツールを定義するために使用されるプリミティブなコルーチン構築ツールが用意されています。
+* _サスペンド関数型_ - サスペンド関数とサスペンドラムダの関数型です。
+   通常の[関数型](http://dogwood008.github.io/kotlin-web-site-ja/docs/reference/lambdas.html#関数型)に似ていますが、`suspend` 修飾子が付いています。
+   たとえば、`suspend() -> Int` は `Int` を返す引数のないサスペンド関数の型です。
+   `suspend fun foo(): Int` のように宣言されたサスペンド関数は、この関数型に準拠しています。
+
+* _コルーチンビルダー_ - 引数としていくつかの_サスペンドラムダ_を取り、コルーチンを作成し、オプションでその結果へのアクセスを与える関数。
+   たとえば、 ユースケースで示した `launch{}`、`future{}`、`buildSequence{}` は、ライブラリに定義されているコルーチンのビルダーです。
+   標準ライブラリは、他のすべてのコルーチンビルダーを定義するためのプリミティブなコルーチンビルダーを提供します。
 
 > Note: Some languages have hard-coded support for particular ways to create and start a coroutines that define
   how their execution and result are represented. For example, `generate` _keyword_ may define a coroutine that 
