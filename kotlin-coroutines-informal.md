@@ -329,28 +329,20 @@ kotlin-stdlibのコルーチンに関連するすべてのAPIは、`kotlin.corou
   たとえば、 ユースケースで示した `launch{}`、`future{}`、`buildSequence{}` は、ライブラリに定義されているコルーチンのビルダーです。
   標準ライブラリは、他のすべてのコルーチンビルダーを定義するためのプリミティブなコルーチンビルダーを提供します。
 
-> Note: Some languages have hard-coded support for particular ways to create and start a coroutines that define
-  how their execution and result are represented. For example, `generate` _keyword_ may define a coroutine that 
-  returns a certain kind of iterable object, while `async` _keyword_ may define a coroutine that returns a
-  certain kind of promise or task. Kotlin does not have keywords or modifiers to define and start a coroutine. 
-  Coroutine builders are simply functions defined in a library. 
-  In case where a coroutine definition takes the form of a method body in another language, 
-  in Kotlin such method would typically be a regular method with an expression body, 
-  consisting of an invocation of some library-defined coroutine builder whose last argument is a suspending lambda:
-注：一部の言語では、実行と結果の表現方法を定義するコルーチンを作成して開始する特定の方法をハードコーディングでサポートしています。たとえば、generate keywordは特定の種類の反復可能オブジェクトを返すコルーチンを定義しますが、async キーワードは特定の種類の約束またはタスクを返すコルーチンを定義します。コトリンには、コルーチンを定義して開始するためのキーワードや修飾語はありません。コルーチンのビルダーは、単にライブラリ内で定義された関数です。コルーチンの定義が別の言語のメソッド本体の形を取る場合、そのようなメソッドは通常、式本体を持つ通常のメソッドであり、最後の引数がサスペンドラムダであるライブラリ定義コルーチンビルダーの呼び出しから成ります：
+> 注：一部の言語では、実行と結果の表現方法を定義するコルーチンを作成して開始する特定の方法をハードコーディングでサポートしています。
+たとえば、`generate` _キーワード_はある種の反復可能オブジェクトを返すコルーチンを定義し、` async` _キーワード_ はある種のpromiseやタスクを返すコルーチンを定義します。
+Kotlinには、コルーチンを定義して開始するためのキーワードや修飾子はありません。
+コルーチンのビルダーは、単にライブラリ内で定義された関数です。
+コルーチンの定義が別の言語のメソッド本体の形を取っている場合、Kotlinでは典型的に、式本体を持つ通常のメソッドであり、最後の引数がサスペンドラムダであるライブラリ定義のコルーチンビルダーの呼び出しから成ります。
  
 ```kotlin
 fun asyncTask() = async { ... }
 ```
 
-* A _suspension point_ — is a point during coroutine execution where the execution of the coroutine _may be suspended_. 
-Syntactically, a suspension point is an invocation of suspending function, but the actual
-suspension happens when the suspending function invokes the standard library primitive to suspend the execution.
-* サスペンションポイントは -コルーチンの実行がコルーチン実行中のポイントです懸濁させることができます。構文的には、中断ポイントは中断関数の呼び出しですが、中断関数が標準ライブラリプリミティブを呼び出して実行を中断すると、実際の中断が発生します。
+* 中断ポイント_ - コルーチンの実行が_中断される可能性がある_ポイントです。
+構文的には、中断ポイントはサスペンド関数の呼び出しですが、中断関数が標準ライブラリプリミティブを呼び出して実行を中断すると、実際の中断が発生します。
 
-* A _continuation_ — is a state of the suspended coroutine at suspension point. It conceptually represents 
-the rest of its execution after the suspension point. For example:
-* 継続は -サスペンションポイントで中断コルーチンの状態です。サスペンド後の残りの実行を概念的に表しています。例えば：
+* _継続_ - 中断ポイントで中断したコルーチンの状態です。中断ポイントのあとの残りの実行を概念的に表しています。例えば、
 
 ```kotlin
 buildSequence {
@@ -359,26 +351,15 @@ buildSequence {
 }  
 ```  
 
-Here, every time the coroutine is suspended at a call to suspending function `yield()`, 
-_the rest of its execution_ is represented as a continuation, so we have 10 continuations: 
-first runs the loop with `i = 2` and suspends, second runs the loop with `i = 3` and suspends, etc, 
-the last one prints "over" and completes the coroutine. The coroutine that is _created_, but is not 
-_started_ yet, is represented by its _initial continuation_ of type `Continuation<Unit>` that consists of
-its whole execution.
-ここでは、コルーチンがサスペンド機能の呼び出しで中断されるたびにyield()、 実行の残りの部分が継続として表されるので、最初にループを実行しi = 2て中断し、2番目にループを実行しi = 3て中断します。最後のものが「上に」印刷され、コルーチンが完成します。さコルーチン作成されていないが、 始めた、まだは、そのによって表される最初の継続型のContinuation<Unit>その全体の実行で構成されています。
+ここでは、コルーチンがサスペンド関数 `yield()` の呼び出しで中断されるたびに_残りの実行_は継続として表されるので、10個の継続があります。
+最初にループを実行して `i = 2` で中断し、2番目にループを実行して `i = 3` で中断し、最後のコマンドで "over" を出力してコルーチンを完成させます。
+_作成_されてまだ_開始_されていないコルーチンは、その実行全体からなる `Continuation<Unit>' 型の初期の継続によって表されます。
 
-As mentioned above, one of the driving requirements for coroutines is flexibility:
-we want to be able to support many existing asynchronous APIs and other use cases and minimize 
-the parts hard-coded into the compiler. As a result, the compiler is only responsible for support
-of suspending functions, suspending lambdas, and the corresponding suspending function types. 
-There are few primitives in the standard library and the rest is left to application libraries. 
-前述したように、コルーチンの駆動要件の1つは柔軟性です。既存の多くの非同期APIやその他のユースケースをサポートし、コンパイラーにハードコードされた部分を最小限に抑えたいと考えています。その結果、コンパイラは、関数のサスペンド、ラムダのサスペンド、および対応するサスペンド関数の種類のサポートのみを行います。標準ライブラリにはいくつかのプリミティブがあり、残りはアプリケーションライブラリに残されています。
+前述したように、コルーチンの駆動要件の1つは柔軟性です。既存の多くの非同期APIやその他のユースケースをサポートし、コンパイラーにハードコードされた部分を最小限に抑えたいと考えています。その結果コンパイラは、サスペンド関数、サスペンドラムダ、および対応するサスペンド関数型のサポートのみを行います。標準ライブラリにはいくつかのプリミティブがあり、残りはアプリケーションライブラリに残されています。
 
-### Continuation interface 継続インタフェース
+### 継続インタフェース
 
-Here is the definition of the standard library interface `Continuation`, which represents
-a generic callback:
-Continuation一般的なコールバックを表す標準ライブラリインタフェースの定義を次に示します。
+一般的なコールバックを表す標準ライブラリインタフェース `Continuation` の定義を次に示します。
 
 ```kotlin
 interface Continuation<in T> {
@@ -388,53 +369,37 @@ interface Continuation<in T> {
 }
 ```
 
-The context is covered in details in [coroutine context](#coroutine-context) section and represents an arbitrary
-user-defined context that is associated with the coroutine. Functions `resume` and `resumeWithException` are _completion_
-callbacks that are used to provide either a successful result (via `resume`) or
-to report a failure (via `resumeWithException`) on coroutine completion.
-コンテキストは、コルーチンコンテキストセクションの詳細でカバーされ、コルーチンに関連付けられている任意のユーザ定義コンテキストを表します。関数resumeとresumeWithExceptionしている完了 成功した結果（を経由してのいずれかを提供するために使用されるコールバックresume）または失敗（ビアを報告するresumeWithExceptionコルーチン完了時に）。
+コンテキストは、[コルーチンのコンテキスト](#コルーチンのコンテキスト)セクションの詳細でカバーされ、コルーチンに関連付けられている任意のユーザ定義コンテキストを表します。
+関数 `resume` と ` resumeWithException` は、`resume` で成功した結果を提供するか、コルーチン完了時に `resumeWithException` で失敗を報告する完了コールバックです。
 
-### Suspending functions サスペンド機能
+### サスペンド関数
 
-An implementation of a typical _suspending function_ like `.await()` looks like this:
-典型的なの実装懸濁化機能など.await()、次のようになります。
+`.await()` のような典型的な_サスペンド関数_の実装は次のようになります。
   
 ```kotlin
 suspend fun <T> CompletableFuture<T>.await(): T =
     suspendCoroutine<T> { cont: Continuation<T> ->
         whenComplete { result, exception ->
-            if (exception == null) // the future has been completed normally
+            if (exception == null) // futureは正常に終了した
                 cont.resume(result)
-            else // the future has completed with an exception
+            else // futureは例外で終了した
                 cont.resumeWithException(exception)
         }
     }
 ``` 
 
-> You can get this code [here](examples/future/await.kt).
-  Note: this simple implementation suspends coroutine forever if the future never completes.
-  The actual implementation in [kotlinx.coroutines](https://github.com/kotlin/kotlinx.coroutines) is slightly more
-  involved, because it supports cancellation.
-ここでこのコードを入手できます。注：この簡単な実装は、未来が完了しなければ、コルーチンを永久に中断します。kotlinx.coroutinesでの実際の実装は、取り消しをサポートするので、やや複雑です。
+> [ここ](examples/future/await.kt)でこのコードを入手できます。注：この簡単な実装は、futureが完了しなければ、コルーチンを永久に中断します。実際の[kotlinx.coroutines](https://github.com/kotlin/kotlinx.coroutines)の実装は取り消しをサポートするのでやや複雑です。
 
-The `suspend` modifier indicates that this is a function that can suspend execution of a coroutine.
-This particular function is defined as an 
-[extension function](https://kotlinlang.org/docs/reference/extensions.html)
-on `CompletableFuture<T>` type so that its usage reads naturally in the left-to-right order
-that corresponds to the actual order of execution:
-suspend修飾子は、これはコルーチンの実行を中断することができる機能であることを示しています。この特定の機能は次のように定義された 拡張機能 についてCompletableFuture<T>、その使用方法は、実行の実際の順序に対応して左から右の順に自然に読むように入力します。
+`suspend` 修飾子は、コルーチンの実行を中断することができる関数であることを表しています。
+この特定の関数は、`CompletableFuture<T>` 型の[拡張関数](http://dogwood008.github.io/kotlin-web-site-ja/docs/reference/extensions.html)として定義され、実際の実行順序に対応して左から右の順に自然に読みます。
 
 ```kotlin
 asyncOperation(...).await()
 ```
  
-A modifier `suspend` may be used on any function: top-level function, extension function, member function, 
-or operator function.
-修飾子suspendは、トップレベル関数、拡張関数、メンバ関数、または演算子関数のいずれかの関数で使用できます。
+修飾子 `suspend` は、トップレベル関数、拡張関数、メンバー関数、または演算子関数のいずれかの関数で使用できます。
 
-> Note, in the current release local functions, property getters/setters, and constructors 
-  cannot have `suspend` modifier. These restrictions will be lifted in the future.
-現在のリリースのローカル関数では、プロパティgetters / settersおよびコンストラクタにはsuspend修飾子を付けることはできません。これらの規制は将来廃止される予定です。
+> 現在のリリースのローカル関数、プロパティのゲッター/セッターおよびコンストラクタには `suspend` 修飾子を付けることはできません。これらの規制は将来廃止される予定です。
  
 Suspending functions may invoke any regular functions, but to actually suspend execution they must
 invoke some other suspending function. In particular, this `await` implementation invokes a suspending function
