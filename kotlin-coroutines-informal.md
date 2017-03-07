@@ -7,7 +7,7 @@
 
 ##要約
 
-これはKotlinのコルーチンの説明です。 This concept is also known as, or partly covers
+これはKotlinのコルーチンの説明です。この概念は次のものとして知られているか、部分的に含まれています。
 
 - ジェネレーター/yield
 - async/await
