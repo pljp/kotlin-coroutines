@@ -11,7 +11,7 @@
 
 - ジェネレーター/yield
 - async/await
-- 構成可能/区切りの継続
+- composable/delimited continuations
 
 ゴール：
 
