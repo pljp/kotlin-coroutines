@@ -1,4 +1,4 @@
-# Kotlinのコルーチン (Revision 3.2)
+# Kotlinコルーチン (Coroutines for Kotlin - Revision 3.2)
 
 * **Type**: Informal description
 * **Author**: Andrey Breslav
