@@ -318,16 +318,16 @@ kotlin-stdlibのコルーチンに関連するすべてのAPIは、`kotlin.corou
 
 > 注意 : サスペンドラムダは、このラムダの[非ローカル](http://dogwood008.github.io/kotlin-web-site-ja/docs/reference/returns.html) `return` 文が許可されているコードのすべての場所でサスペンド関数を呼び出せます。
   つまり、 [`apply{}` ブロック](https://kotlinlang.org/api/latest/jvm/stdlib/kotlin/apply.html) のようなインラインラムダの中で関数呼び出しを中断することは許されますが、 `noinline` や `crossinline` の内部ラムダ式では許可されません。
-   _中断_は特別な種類の非ローカル制御転送として扱われます。
+  _中断_は特別な種類の非ローカル制御転送として扱われます。
 
 * _サスペンド関数型_ - サスペンド関数とサスペンドラムダの関数型です。
-   通常の[関数型](http://dogwood008.github.io/kotlin-web-site-ja/docs/reference/lambdas.html#関数型)に似ていますが、`suspend` 修飾子が付いています。
-   たとえば、`suspend() -> Int` は `Int` を返す引数のないサスペンド関数の型です。
-   `suspend fun foo(): Int` のように宣言されたサスペンド関数は、この関数型に準拠しています。
+  通常の[関数型](http://dogwood008.github.io/kotlin-web-site-ja/docs/reference/lambdas.html#関数型)に似ていますが、`suspend` 修飾子が付いています。
+  たとえば、`suspend() -> Int` は `Int` を返す引数のないサスペンド関数の型です。
+  `suspend fun foo(): Int` のように宣言されたサスペンド関数は、この関数型に準拠しています。
 
 * _コルーチンビルダー_ - 引数としていくつかの_サスペンドラムダ_を取り、コルーチンを作成し、オプションでその結果へのアクセスを与える関数。
-   たとえば、 ユースケースで示した `launch{}`、`future{}`、`buildSequence{}` は、ライブラリに定義されているコルーチンのビルダーです。
-   標準ライブラリは、他のすべてのコルーチンビルダーを定義するためのプリミティブなコルーチンビルダーを提供します。
+  たとえば、 ユースケースで示した `launch{}`、`future{}`、`buildSequence{}` は、ライブラリに定義されているコルーチンのビルダーです。
+  標準ライブラリは、他のすべてのコルーチンビルダーを定義するためのプリミティブなコルーチンビルダーを提供します。
 
 > Note: Some languages have hard-coded support for particular ways to create and start a coroutines that define
   how their execution and result are represented. For example, `generate` _keyword_ may define a coroutine that 
