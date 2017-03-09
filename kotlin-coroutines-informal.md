@@ -11,7 +11,7 @@
 
 - ジェネレーター/yield
 - async/await
-- composable/delimited continuations
+- 部分継続/限定継続
 
 ゴール：
 
@@ -34,8 +34,8 @@
   * [継続インタフェース](#継続インタフェース)
   * [サスペンド関数](#サスペンド関数)
   * [コルーチンビルダー](#コルーチンビルダー)
-  * [コルーチンのコンテキスト](#コルーチンのコンテキスト)
-  * [継続インターセプタ](#継続インターセプタ)
+  * [コルーチンコンテキスト](#コルーチンコンテキスト)
+  * [継続インターセプター](#継続インターセプター)
   * [制限付きサスペンド](#制限付きサスペンド)
 * [その他の例](#その他の例)
   * [コールバックのラッピング](#コールバックのラッピング)
@@ -50,7 +50,7 @@
   * [並行処理とスレッド](#並行処理とスレッド)
   * [非同期プログラミングスタイル](#非同期プログラミングスタイル)
 * [実装の詳細](#実装の詳細)
-  * [Continuation passing style](#continuation-passing-style)
+  * [継続渡しスタイル](#継続渡しスタイル)
   * [状態マシン](#状態マシン)
   * [サスペンド関数のコンパイル](#サスペンド関数のコンパイル)
   * [Coroutine intrinsics](#coroutine-intrinsics)
@@ -316,7 +316,7 @@ kotlin-stdlibのコルーチンに関連するすべてのAPIは、`kotlin.corou
   サスペンド関数を呼び出すことによって、現在の実行スレッドをブロックせずにコードの実行を_中断_することができます。
   例えば、 [ユースケース](#ユースケース)で示されている `launch`、` future`、`buildSequence` 関数に続く中括弧で囲まれたコードブロックは、サスペンドラムダです。
 
-> 注意 : サスペンドラムダは、このラムダの[非ローカル](http://dogwood008.github.io/kotlin-web-site-ja/docs/reference/returns.html) `return` 文が許可されているコードのすべての場所でサスペンド関数を呼び出せます。
+> 注：サスペンドラムダは、このラムダの[非ローカル](http://dogwood008.github.io/kotlin-web-site-ja/docs/reference/returns.html) `return` 文が許可されているコードのすべての場所でサスペンド関数を呼び出せます。
   つまり、 [`apply{}` ブロック](https://kotlinlang.org/api/latest/jvm/stdlib/kotlin/apply.html) のようなインラインラムダの中で関数呼び出しを中断することは許されますが、 `noinline` や `crossinline` の内部ラムダ式では許可されません。
   _中断_は特別な種類の非ローカル制御転送として扱われます。
 
@@ -369,7 +369,7 @@ interface Continuation<in T> {
 }
 ```
 
-コンテキストは、[コルーチンのコンテキスト](#コルーチンのコンテキスト)セクションの詳細でカバーされ、コルーチンに関連付けられている任意のユーザ定義コンテキストを表します。
+コンテキストは、[コルーチンコンテキスト](#コルーチンコンテキスト)セクションの詳細でカバーされ、コルーチンに関連付けられている任意のユーザ定義コンテキストを表します。
 関数 `resume` と ` resumeWithException` は、`resume` で成功した結果を提供するか、コルーチン完了時に `resumeWithException` で失敗を報告する完了コールバックです。
 
 ### サスペンド関数
@@ -401,42 +401,27 @@ asyncOperation(...).await()
 
 > 現在のリリースのローカル関数、プロパティのゲッター/セッターおよびコンストラクタには `suspend` 修飾子を付けることはできません。これらの規制は将来廃止される予定です。
  
-Suspending functions may invoke any regular functions, but to actually suspend execution they must
-invoke some other suspending function. In particular, this `await` implementation invokes a suspending function
-`suspendCoroutine` that is defined in the standard library as a top-level suspending function in the following way:
-サスペンド機能は通常の機能を呼び出すことができますが、実際にはサスペンド機能を呼び出す必要があります。特に、このawait実装は、次のsuspendCoroutine方法でトップレベルの一時停止関数として標準ライブラリに定義されている一時停止関数を呼び出します 。
+サスペンド関数は通常の関数を呼び出すことができますが、実際に実行を中断するには他のサスペンド関数を呼び出す必要があります。
+特に、この `await` 実装は、次の方法でトップレベルのサスペンド関数として標準ライブラリに定義されたサスペンド関数 ` suspendCoroutine` を呼び出します。
 
 ```kotlin
 suspend fun <T> suspendCoroutine(block: (Continuation<T>) -> Unit): T
 ```
 
-When `suspendCoroutine` is called inside a coroutine (and it can _only_ be called inside
-a coroutine, because it is a suspending function) it _suspends_ the execution of coroutine, captures its
-state in a _continuation_ instance and passes this continuation to the specified `block` as an argument.
-To resume execution of the coroutine, the block may call either `continuation.resume()` or
-`continuation.resumeWithException()` in this thread of in some other thread. 
-Resuming the same continuation more than once is not allowed and produces `IllegalStateException`.
-ときは、suspendCoroutine（それができコルーチンの内部と呼ばれているだけ、それは懸濁化機能であるため、コルーチンの内側と呼ばれることが）中断しコルーチンの実行を、でその状態をキャプチャ継続インスタンスと指定し、この継続を渡すblock引数として。コルーチンの実行を再開するには、ブロックのいずれか呼び出すことができcontinuation.resume()、または continuation.resumeWithException()いくつかの他のスレッドでのこのスレッドで。同じ継続を2回以上再開することは許可されずに行われIllegalStateExceptionます。
+コルーチンの内部で `suspendCoroutine` が呼び出されると（これはサスペンド関数であるため、コルーチン内でのみ呼び出すことができます）、コルーチンの実行を_中断_し、_継続_インスタンスにその状態をキャプチャして、この継続を指定された`ブロック `に引数として渡します。
+コルーチンの実行を再開するために、ブロックは他のスレッドでこのスレッドの `continuation.resume()` または `continuation.resumeWithException()` を呼び出すことができます。
+同じ継続を2回以上再開することは許されず、`IllegalStateException` を生成します。
 
-> Note: That is the key difference between coroutines in Kotlin and first-class delimited continuations in 
-functional languages like Scheme or continuation monad in Haskel. The choice to support only limited resume-once 
-continuations is purely pragmatic as none of the intended [uses cases](#use-cases) need first-class continuations 
-and we can more efficiently implement limited version of them. However, first-class continuations can be 
-implemented as a separate library by cloning the state of the coroutine that is
-captured in continuation, so that its clone can be resumed again. This mechanism may be efficiently 
-provided by the standard library in the future.
-注：これは、Kotlinのコルーチンと、HaskelのSchemeやContinuation Monadのような機能的な言語のファーストクラスの区切り付き継続との主要な違いです。制限された再開一回のみのサポートを選択することは、意図されたユースケースがファーストクラスの継続を必要としないため、純粋に実用的であり、それらの限定バージョンをより効率的に実装することができます。しかし、第1クラスの継続は、連続でキャプチャされたコルーチンの状態を複製することによって別のライブラリとして実装することができ、その複製を再び再開することができます。このメカニズムは、将来、標準ライブラリによって効率的に提供される可能性があります。
+> 注：これは、Kotlinのコルーチンと、SchemeやHaskelの継続モナドのような関数言語のファーストクラスの限定継続との主要な違いです。
+制限された一度だけの再開のみのサポートを選択することは純粋に実用的で、意図された[ユースケース](#ユースケース)がファーストクラスの継続を必要としないため、それらの限定バージョンをより効率的に実装することができます。
+しかし、ファーストクラスの継続は、継続にキャプチャされたコルーチンの状態を複製することによって別のライブラリとして実装することができ、その複製を再び再開することができます。
+このメカニズムは、将来、標準ライブラリによって効率的に提供される可能性があります。
 
-The value passed to `continuation.resume()` becomes the **return value** of `suspendCoroutine()`,
-which, in turn, becomes the return value of `.await()` when the coroutine _resumes_ its execution.
-渡される値はの戻り値にcontinuation.resume()なります。suspendCoroutine()これは.await()、コルーチンが実行を再開したときの戻り値になります。
+`continuation.resume()` に渡された値は `suspendCoroutine()` の**戻り値**になり、コルーチンが実行を_再開_すると `.await()` の戻り値になります。
 
-### Coroutine builders コルーチンのビルダー
+### コルーチンビルダー
 
-Suspending functions cannot be invoked from regular functions, so the standard library provides functions
-to start coroutine execution from a regular non-suspending scope. Here is the implementation of a simple
-`launch{}` _coroutine builder_:
-サスペンド機能は通常の関数から呼び出すことができないので、標準ライブラリは通常の非サスペンドスコープからコルーチンの実行を開始する関数を提供します。シンプルな launch{} コルーチンビルダーの実装を以下に示します。
+サスペンド関数は通常の関数から呼び出すことができないので、標準ライブラリは通常の非サスペンドスコープからコルーチンの実行を開始する関数を提供します。シンプルな `launch{}` _コルーチンビルダー_の実装を以下に示します。
 
 ```kotlin
 fun launch(context: CoroutineContext, block: suspend () -> Unit) =
@@ -452,69 +437,40 @@ private class StandaloneCoroutine(override val context: CoroutineContext): Conti
 }
 ```
 
-> You can get this code [here](examples/run/launch.kt).
-ここでこのコードを入手できます。
+> [ここ](examples/run/launch.kt)でこのコードを入手できます。
 
-This implementation defines a simple class `StandaloneCoroutine` that represents this coroutine and
-implements `Continuation` interface to capture its completion.
-The completion of coroutine invokes its _completion continuation_. Its `resume` or `resumeWithException`
-functions are invoked when coroutine _completes_ with the result or exception correspondingly.
-Because `launch` does "fire-and-forget"
-coroutine, it is defined for suspending functions with `Unit` return type and actually ignores
-this result in its `resume` function. If coroutine execution completes with exception,
-then the uncaught exception handler of the current thread is used to report it.
-この実装は、このコルーチンを表す単純なクラスStandaloneCoroutineを定義し、Continuationその補完を取得するためのインタフェースを実装します。コルーチンの完成はその完了の継続を呼び起こす。そのresumeまたはresumeWithException コルーチンは時の機能が起動される完了し、対応した結果または例外を除いて。のでlaunch「火と-忘れる」コルーチンない、それが持つ関数を懸濁させるために定義されるUnit戻り値の型と、実際にその中で、この結果を無視するresume機能。コルーチンの実行が例外で完了すると、現在のスレッドのキャッチされていない例外ハンドラがそれを報告するために使用されます。
+この実装は、このコルーチンを表す単純なクラス `StandaloneCoroutine` を定義し、その完了を取得するための `Continuation` インタフェースを実装します。
+コルーチンの完了はその_完了の継続_を呼び出します。
+その `resume` または `resumeWithException` 関数は、コルーチンが結果または例外での_完了_に対応して呼び出されます。
+`launch`はコルーチンを「撃ち放し」にするため、戻り値の型は `Unit` 型でサスペンド関数が定義され、実際には `resume` 関数でこの結果を無視します。
+コルーチンの実行が例外で完了すると、現在のスレッドのキャッチされていない例外ハンドラがそれを報告するために使用されます。
 
-> Note: this simple implementation returns `Unit` and provides no access to the state of the coroutine at all. 
-  The actual implementation in [kotlinx.coroutines](https://github.com/kotlin/kotlinx.coroutines) is more
-  complex, because it returns an instance of `Job` interface that represents a coroutine and can be cancelled.
-注：この単純な実装はUnit、コルーチンの状態に戻ってアクセスすることは全くありません。kotlinx.coroutinesの実際の実装は、コルーチンを表すインターフェイスのインスタンスを返し、Job取り消すことができるため、より複雑です。
+> 注：この単純な実装は `Unit` を返し、コルーチンの状態へのアクセスをまったく提供しません。
+[kotlinx.coroutines](https://github.com/kotlin/kotlinx.coroutines)の実際の実装はより複雑です。なぜなら、コルーチンを表す `Job`インタフェースのインスタンスを返し、取り消すことができるからです。
 
-The context is covered in details in [coroutine context](#coroutine-context) section.
-It suffices to say here that it is a good style to include a `context` parameter in 
-library-defined coroutine builders for better _composition_ with other libraries that may define useful 
-context elements.
-文脈は、コルーチンの文脈のセクションで詳しく説明されています。ここでは、有用なコンテキスト要素を定義する可能性がある他のcontextライブラリとのより良い合成のために、ライブラリ定義のコルーチン構築者にパラメータを含めることは良いスタイルだと言えば十分です。
+コンテキストは、[コルーチンコンテキスト](#コルーチンコンテキスト)のセクションで詳しく説明されています。
+ここでは、有用なコンテキスト要素を定義する可能性がある他のライブラリとのより良い_合成_のために、ライブラリ定義のコルーチンビルダーに `context` パラメータを含めることは良いスタイルだと言えば十分です。
 
-The `startCoroutine` is defined in the standard library as an extension for suspending function type. 
-Its signature is:
-startCoroutine関数型を懸濁するための拡張機能として標準ライブラリで定義されています。その署名は次のとおりです。
+`startCoroutine` は、スタンダードライブラリ内で、サスペンド関数型の拡張として定義されています。
+そのシグネイチャーは次のとおりです。
 
 ```kotlin
 fun <T> (suspend  () -> T).startCoroutine(completion: Continuation<T>)
 ```
 
-The `startCoroutine` creates coroutine and starts its execution immediately, in the current thread (but see remark below),
-until the first _suspension point_, then it returns.
-Suspension point is an invocation of some [suspending function](#suspending-functions) in the body of the coroutine and
-it is up to the code of the corresponding suspending function to define when and how the coroutine execution resumes.
-startCoroutineコルーチン作成し、すぐにその実行を開始し、現在のスレッドで（但し、下記のコメントを参照）、最初までサスペンションポイント、それが返されます。サスペンションポイントは、コルーチンの本体にいくつかの中断関数が呼び出されたもので、コルーチンの実行がいつ再開するかは、対応する中断関数のコードによって決まります。
+`startCoroutine`はコルーチンを作成し、現在のスレッドですぐに最初の_中断ポイント_まで実行を開始し（以下の注釈を参照してください）、リターンします。
+中断ポイントはコルーチン本体での[サスペンド関数](#サスペンド関数)の呼び出しで、コルーチンの実行がいつどのように再開するかは、対応するサスペンド関数のコードによって決まります。
 
-> Note: continuation interceptor (from the context) that is covered [later](#continuation-interceptor), can dispatch
-the execution of the coroutine, _including_ its initial continuation, into another thread.
-注意：カバーされている（コンテキストから）継続迎撃後に、コルーチンの実行を派遣することができるなど、他のスレッドに、その初期の継続。
+> 注：後で説明する[継続インターセプタ](#継続インターセプター)（コンテキストから）は、最初の継続を_含む_コルーチンの実行を別のスレッドにディスパッチできます。
 
-### Coroutine context コルーチンの文脈
+### コルーチンコンテキスト
 
-Coroutine context is a persistent set of user-defined objects that can be attached to the coroutine. It
-may include objects responsible for coroutine threading policy, logging, security and transaction aspects of the
-coroutine execution, coroutine identity and name, etc. Here is the simple mental model of coroutines and their
-contexts. Think of a coroutine as a light-weight thread. In this case, coroutine context is just like a collection 
-of thread-local variables. The difference is that thread-local variables are mutable, while coroutine context is
-immutable, which is not a serious limitation for coroutines, because they are so light-weight that it is easy to
-launch a new coroutine when there is a need to change something in the context.
-コルーチンコンテキストは、コルーチンに接続できる永続的なユーザ定義オブジェクトのセットです。これは、コルーチンのスレッドポリシー、ログ、コルーチンの実行のセキュリティとトランザクションの側面、コルーチンのアイデンティティーと名前などを担当するオブジェクトを含むことができます。コルーチンとそのコンテキストの単純なメンタルモデルがあります。コルーチンを軽量スレッドと考えてください。この場合、コルーチンのコンテキストは、スレッドローカル変数の集合のようなものです。相違点は、スレッドローカル変数は変更可能ですが、コルーチンのコンテキストは不変であることです。コルーチンの重大な制限ではないため、何かを変更する必要があるときに新しいコルーチンを起動するのは軽いためです。文脈で。
+コルーチンコンテキストは、コルーチンに添付できる永続的なユーザ定義オブジェクトのセットです。これは、コルーチンのスレッドポリシー、ロギング、コルーチンの実行のセキュリティとトランザクションの様相、コルーチンの識別子と名前などを担当するオブジェクトを含むことができます。コルーチンとそのコンテキストの単純なメンタルモデルがあります。コルーチンを軽量スレッドと考えてください。この場合、コルーチンのコンテキストは、スレッドローカル変数の集合のようなものです。
+相違点は、スレッドローカル変数は変更可能でコルーチンのコンテキストは不変であることですが、コンテキストの中で何かを変更する必要があるときに新しいコルーチンを起動するのは簡単で軽量であるため、コルーチンの重大な制限ではありません。
 
-The standard library does not contain any concrete implementations of the context elements, 
-but has interfaces and abstract classes so that all these aspects
-can be defined in libraries in a _composable_ way, so that aspects from different libraries can coexist
-peacefully as elements of the same context.
-標準ライブラリには、コンテキスト要素の具体的な実装は含まれていませんが、インタフェースと抽象クラスがあり、これらのすべての側面をライブラリで構成可能な方法で定義できるため、異なるライブラリの要素を同じコンテキストの要素。
+標準ライブラリには、コンテキスト要素の具体的な実装は含まれていませんが、インタフェースと抽象クラスがあり、これらのすべての様相をライブラリで_構成可能_な方法で定義することができるため、異なるライブラリからの様相を同じ文脈の要素として平和的に共存させることができます。
 
-Conceptually, coroutine context is an indexed set of elements, where each element has a unique key.
-It is a mix between a set and a map. Its elements have keys like in a map, but its keys are directly associated
-with elements, more like in a set. The standard library defines the minimal interface for `CoroutineContext`:
-概念的には、コルーチンのコンテキストは、各要素に一意のキーを持つ要素のインデックス付きセットです。これは、セットとマップのミックスです。その要素はマップのようなキーを持っていますが、キーは要素に直接関連付けられています。標準ライブラリは、以下のための最小限のインタフェースを定義しCoroutineContextます。
+概念的には、コルーチンのコンテキストは、各要素に一意のキーを持つ要素のインデックス付きセットです。これは、セットとマップのミックスです。その要素はマップのようなキーを持っていますが、キーは要素に直接関連付けられています。標準ライブラリは、`CoroutineContext` のための最小限のインタフェースを定義します。
 
 ```kotlin
 interface CoroutineContext {
@@ -531,21 +487,12 @@ interface CoroutineContext {
 }
 ```
 
-The `CoroutineContext` itself has four core operations available on it:
-CoroutineContext自身がそれに利用可能な4つのコア事業を展開しています：
+'CoroutineContext' はそれ自身に利用可能な4つの中核操作を持っています。
 
-* Operator `get` provides type-safe access to an element for a given key. It can be used with `[..]` notation
-  as explained in [Kotlin operator overloading](https://kotlinlang.org/docs/reference/operator-overloading.html).
-* オペレータgetは、指定されたキーの要素への型セーフなアクセスを提供します。これは、Kotlin演算子のオーバーロードで説明した[..]表記法で使用できます。
-* Function `fold` works likes [`Collection.fold`](https://kotlinlang.org/api/latest/jvm/stdlib/kotlin.collections/fold.html)
-  extension in the standard library and provides means to iterate all elements in the context.
-* Function foldworks Collection.fold は、標準ライブラリの拡張を好み、コンテキスト内のすべての要素を反復する手段を提供します。
-* Operator `plus` works like [`Set.plus`](https://kotlinlang.org/api/latest/jvm/stdlib/kotlin.collections/plus.html)
-  extension in the standard library and returns a combination of two contexts with elements on the right-hand side
-  of plus replacing elements with the same key on the left-hand side.
-* 演算子plusはSet.plus 標準ライブラリの拡張のように機能し、要素の右側の2つのコンテキストの組み合わせを返し、要素を左側の同じキーで置き換えます。
-* Function `minusKey` returns a context that does not contain a specified key.
-* 関数minusKeyは、指定されたキーを含まないコンテキストを返します。
+* `get` 演算子は、指定されたキーの要素への型セーフなアクセスを提供します。これは、[Kotlin演算子のオーバーロード](http://dogwood008.github.io/kotlin-web-site-ja/docs/reference/operator-overloading.html)で説明した[..]表記法で使用できます。
+* `fold` 関数は 標準ライブラリの [`Collection.fold`](https://kotlinlang.org/api/latest/jvm/stdlib/kotlin.collections/fold.html) 拡張のように機能し、コンテキスト内のすべての要素を反復する手段を提供します。
+* 演算子 `plus` は 標準ライブラリの [`Set.plus`](https://kotlinlang.org/api/latest/jvm/stdlib/kotlin.collections/plus.html) 拡張のように機能し、2つのコンテキストの組みの左側の要素を同じキーの右側の要素で置き換えて返します。
+* 関数 `minusKey` は、指定されたキーを含まないコンテキストを返します。
 
 An `Element` of the coroutine context is a context itself. It is a singleton context with this element only.
 This enables creation of composite contexts by taking library definitions of coroutine context elements and
