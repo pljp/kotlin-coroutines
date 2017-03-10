@@ -268,7 +268,7 @@ launch(Swing) {
 }
 ```
 
-> `Swing`コンテキストのライブラリコードは[継続インターセプタ](#continuation-interceptor)セクションに示されています。
+> `Swing`コンテキストのライブラリコードは[継続インターセプター](#continuation-interceptor)セクションに示されています。
 
 すべての例外処理は、自然な言語構造を使用して実行されます。
 
@@ -461,7 +461,7 @@ fun <T> (suspend  () -> T).startCoroutine(completion: Continuation<T>)
 `startCoroutine`はコルーチンを作成し、現在のスレッドですぐに最初の_中断ポイント_まで実行を開始し（以下の注釈を参照してください）、リターンします。
 中断ポイントはコルーチン本体での[サスペンド関数](#サスペンド関数)の呼び出しで、コルーチンの実行がいつどのように再開するかは、対応するサスペンド関数のコードによって決まります。
 
-> 注：後で説明する[継続インターセプタ](#継続インターセプター)（コンテキストから）は、最初の継続を_含む_コルーチンの実行を別のスレッドにディスパッチできます。
+> 注：後で説明する[継続インターセプター](#継続インターセプター)（コンテキストから）は、最初の継続を_含む_コルーチンの実行を別のスレッドにディスパッチできます。
 
 ### コルーチンコンテキスト
 
@@ -494,22 +494,15 @@ interface CoroutineContext {
 * 演算子 `plus` は 標準ライブラリの [`Set.plus`](https://kotlinlang.org/api/latest/jvm/stdlib/kotlin.collections/plus.html) 拡張のように機能し、2つのコンテキストの組みの左側の要素を同じキーの右側の要素で置き換えて返します。
 * 関数 `minusKey` は、指定されたキーを含まないコンテキストを返します。
 
-An `Element` of the coroutine context is a context itself. It is a singleton context with this element only.
-This enables creation of composite contexts by taking library definitions of coroutine context elements and
-joining them with `+`. For example, if one library defines `auth` element with user authorization information,
-and some other library defines `CommonPool` object with some execution context information,
-then you can use a `launch{}` [coroutine builder](#coroutine-builders) with the combined context using
-`launch(auth + CommonPool) {...}` invocation.
-Elementコルーチンのコンテキストのコンテキストそのものです。この要素のみを持つシングルトンコンテキストです。これにより、コルーチンのコンテキスト要素のライブラリ定義を取得して結合することで、複合コンテキストを作成することができます+。たとえば、あるライブラリauthがユーザー認可情報を持つ要素を定義し、他の一部のライブラリがCommonPoolオブジェクトをいくつかの実行コンテキスト情報で定義している場合は、launch{} 呼び出しを使用して合成コンテキストでコルーチン・ビルダーを使用 launch(auth + CommonPool) {...}できます。
+コルーチンコンテキストの `Element' はコンテキスト自体です。 この要素のみを持つシングルトンコンテキストです。
+これにより、コルーチンコンテキスト要素のライブラリ定義を取得し、それらを `+` で結合することによって、複合コンテキストを作成することができます。
+たとえば、あるライブラリがユーザー認証情報を持つ `auth` 要素を定義し、いくつかの他のライブラリがいくつかの実行コンテキスト情報を持つ `CommonPool` オブジェクトを定義している場合、`launch（auth + CommonPool）{...}` を呼び出すことでコンテキストを組み合わせた `launch{}` [コルーチンビルダー](#コルーチンビルダー)を使うことができます。
 
-> Note: [kotlinx.coroutines](https://github.com/kotlin/kotlinx.coroutines) provides several context elements, 
-  including `CommonPool` object that dispatches execution of coroutine onto a shared pool of background threads.
-注意：kotlinx.coroutinesは、コルーチンの実行CommonPoolをバックグラウンドスレッドの共有プールにディスパッチするオブジェクトを含むいくつかのコンテキスト要素を提供します。
+> 注：[kotlinx.coroutines](https://github.com/kotlin/kotlinx.coroutines)は、コルーチンの実行をバックグラウンドスレッドの共有プールにディスパッチする `CommonPool` オブジェクトを含むいくつかのコンテキスト要素を提供します。
 
-All library-defined context elements shall extend `AbstractCoroutineContextElement` class that is provided
-by the standard library. The following style is recommended for library defined context elements.
-The example below shows a hypothetical authorization context element that stores current user name:
-すべてのライブラリ定義コンテキスト要素はAbstractCoroutineContextElement、標準ライブラリによって提供されるクラスを拡張するものとする。ライブラリ定義のコンテキスト要素には、次のスタイルが推奨されます。次の例は、現在のユーザー名を格納する仮の認可コンテキスト要素を示しています。
+すべてのライブラリ定義のコンテキスト要素は、標準ライブラリによって提供される `AbstractCoroutineContextElement` クラスを継承するものとします。
+ライブラリ定義のコンテキスト要素には、次のスタイルが推奨されます。
+次の例は、現在のユーザー名を格納する仮の認可コンテキスト要素を示しています。
 
 ```kotlin
 class AuthUser(val name: String) : AbstractCoroutineContextElement(AuthUser) {
@@ -517,35 +510,27 @@ class AuthUser(val name: String) : AbstractCoroutineContextElement(AuthUser) {
 }
 ```
 
-The definition of context `Key` as a companion object of the corresponding element class enables fluent access
-to the corresponding element of the context. Here is a hypothetical implementation of suspending function that
-needs to check the name of the current user:
-Key対応する要素クラスの付随オブジェクトとしてのコンテキストの定義は、コンテキストの対応する要素への流暢なアクセスを可能にする。現在のユーザーの名前を確認する必要がある一時停止機能の仮説的実装です：
+対応する要素クラスのコンパニオンオブジェクトとしてのコンテキスト `Key` の定義は、コンテキストの対応する要素への流暢なアクセスを可能にする。
+現在のユーザーの名前を確認する必要があるサスペンド関数の仮説的実装です。
 
 ```kotlin
 suspend fun secureAwait(): Unit = suspendCoroutine { cont ->
     val currentUser = cont.context[AuthUser]?.name
-    // do something user-specific
-    // ユーザー固有の操作を行う 
+    // ユーザー固有の処理を行う 
 }
 ```
 
-### Continuation interceptor 継続インターセプタ
+### 継続インターセプター
 
-Let's recap [asynchronous UI](#asynchronous-ui) use case. Asynchronous UI applications must ensure that the 
-coroutine body itself is always executed in UI thread, despite the fact that various suspending functions 
-resume coroutine execution in arbitrary threads. This is accomplished using a _continuation interceptor_.
-First of all, we need to fully understand the lifecycle of a coroutine. Consider a snippet of code that uses 
-[`launch{}`](#coroutine-builders) coroutine builder:
-非同期UIの使用例を要約しましょう。非同期UIアプリケーションでは、さまざまな中断関数が任意のスレッドでコルーチンの実行を再開しても、コルーチン本体自体が常にUIスレッドで実行されるようにする必要があります。これは、継続インターセプタを使用して達成されます。まず、コルーチンのライフサイクルを完全に理解する必要があります。launch{}コルーチンビルダーを使用したコードスニペットを考えてみましょう 。
+[非同期UI](#非同期UI)のユースケースを要約しましょう。非同期UIアプリケーションでは、さまざまなサスペンド関数が任意のスレッドでコルーチンの実行を再開しても、コルーチン本体自体が常にUIスレッドで実行されるようにする必要があります。これは、_継続インターセプター_を使用して達成されます。まず、コルーチンのライフサイクルを完全に理解する必要があります。[`launch{}`](#コルーチンビルダー)コルーチンビルダーを使用したコードスニペットを考えてみましょう 。
 
 ```kotlin
 launch(CommonPool) {
-    initialCode() // execution of initial code 初期コードの実行
-    f1.await() // suspension point #1 中断ポイント #1
-    block1() // execution #1 実行　#1
-    f2.await() // suspension point #2 中断ポイント #2
-    block2() // execution #2 実行 #2
+    initialCode() // 初期コードの実行
+    f1.await() // 中断ポイント #1
+    block1() // 実行 #1
+    f2.await() // 中断ポイント #2
+    block2() // 実行 #2
 }
 ```
 
