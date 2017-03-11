@@ -494,7 +494,7 @@ interface CoroutineContext {
 * 演算子 `plus` は 標準ライブラリの [`Set.plus`](https://kotlinlang.org/api/latest/jvm/stdlib/kotlin.collections/plus.html) 拡張のように機能し、2つのコンテキストの組みの左側の要素を同じキーの右側の要素で置き換えて返します。
 * 関数 `minusKey` は、指定されたキーを含まないコンテキストを返します。
 
-コルーチンコンテキストの `Element' はコンテキスト自体です。 この要素のみを持つシングルトンコンテキストです。
+コルーチンコンテキストの `Element` はコンテキスト自体です。 この要素のみを持つシングルトンコンテキストです。
 これにより、コルーチンコンテキスト要素のライブラリ定義を取得し、それらを `+` で結合することによって、複合コンテキストを作成することができます。
 たとえば、あるライブラリがユーザー認証情報を持つ `auth` 要素を定義し、いくつかの他のライブラリがいくつかの実行コンテキスト情報を持つ `CommonPool` オブジェクトを定義している場合、`launch（auth + CommonPool）{...}` を呼び出すことでコンテキストを組み合わせた `launch{}` [コルーチンビルダー](#コルーチンビルダー)を使うことができます。
 
@@ -534,16 +534,12 @@ launch(CommonPool) {
 }
 ```
 
-Coroutine starts with execution of its `initialCode` until the first suspension point. At the suspension point it
-_suspends_ and, after some time, as defined by the corresponding suspending function, it _resumes_ to execute 
-`block1`, then it suspends again and resumes to execute `block2`, after which it _completes_.
-コルーチンはinitialCode、最初の停止点まで実行を開始します。サスペンション時点で、 中断対応懸濁関数によって定義されるいくつかの時間の後、それは、と再開を実行するために block1、それは再び中断して実行するように再開しblock2、それはその後、完了する。
+コルーチンは最初の中断ポイントまで `initialCode` の実行を開始します。
+中断ポイントでは_中断_し、しばらくして対応するサスペンド関数で定義されたように `block1` の実行に_復帰_し、再び中断して `block2` の実行に復帰した後、_完了_します。
 
-Continuation interceptor has an option to intercept and wrap the continuation that corresponds to the
-execution of `initialCode`, `block1`, and `block2` from their resumption to the subsequent suspension points.
-The initial code of the coroutine is treated as a
-resumption of its _initial continuation_. The standard library provides the following interface:
-継続インターセプタはインターセプトとの実行に対応する継続をラップするためのオプションがありinitialCode、block1およびblock2その後のサスペンションポイントへの再開からを。コルーチンの初期コードは、その再開のように扱われている初期継続。標準ライブラリは、次のインタフェースを提供します。
+継続インターセプターには `initialCode`、` block1`、および `block2` の実行に対応する継続を、それらの後続の中断ポイントへの再開からインターセプトしてラップするオプションがあります。
+コルーチンの初期コードは、_初期継続_の再開として扱われます。
+標準ライブラリは、次のインタフェースを提供します。
  
 ```kotlin
 interface ContinuationInterceptor : CoroutineContext.Element {
@@ -552,25 +548,17 @@ interface ContinuationInterceptor : CoroutineContext.Element {
 }
  ```
  
-The `interceptContinuation` function wraps the continuation of the coroutine. Whenever coroutine is suspended,
-coroutine framework uses the following line of code to wrap the actual `continuation` for the subsequent
-resumption:
-このinterceptContinuation関数は、コルーチンの継続をラップします。コルーチンが中断されると、coroutineフレームワークは次のコード行を使用して、後続の再開のために実際のcontinuationものをラップします。
+この `interceptContinuation` 関数は、コルーチンの継続をラップします。コルーチンが中断されると、コルーチンフレームワークは次のコード行を使用して、後続の再開のために実際の `continuation` をラップします。
 
 ```kotlin
 val facade = continuation.context[ContinuationInterceptor]?.interceptContinuation(continuation) ?: continuation
 ```
  
-Coroutine framework caches the resulting facade for each actual instance of continuation. See
-[implementation details](#implementation-details) section for more details.
-コルーチンのフレームワークは、継続の各実際のインスタンスの結果としてのファサードをキャッシュします。詳細については、 実装の詳細のセクションを参照してください。
+コルーチンフレームワークは、継続の各実際のインスタンスの結果としてのファサードをキャッシュします。詳細については、 [実装の詳細](#実装の詳細)のセクションを参照してください。
 
-Let us take a look at a concrete example code for `Swing` interceptor that dispatches execution onto
-Swing UI event dispatch thread. We start with a definition of a `SwingContinuation` wrapper class that
-checks the current thread and makes sure that continuation resumes only in Swing event dispatch thread.
-If the execution already happens in UI thread, then `Swing` just invokes an appropriate `cont.resume` right away,
-otherwise it dispatches execution of the continuation onto Swing UI thread using `SwingUtilities.invokeLater`.
-SwingSwing UIイベントディスパッチスレッドに実行をディスパッチするインターセプタの具体的なコード例を見てみましょう。SwingContinuation現在のスレッドをチェックし、継続がスウィングイベントディスパッチスレッドでのみ再開するようにするラッパークラスの定義から始めます。実行がUIスレッドで既に発生している場合Swingは、すぐにcont.resume適切なメソッドを呼び出すだけです。それ以外の場合は、UIメソッドを使用して継続の実行をSwing UIスレッドにディスパッチしSwingUtilities.invokeLaterます。
+実行をSwing UIイベントディスパッチスレッドにディスパッチする `Swing` インターセプターの具体的なコード例を見てみましょう。
+現在のスレッドをチェックし、継続がSwingイベントディスパッチスレッドでのみ再開することを確認する `SwingContinuation` ラッパークラスの定義から始めます。
+実行がUIスレッドで既に発生している場合、 `Swing` はすぐに適切な `cont.resume`を呼び出します。そうでなければ  `SwingUtilities.invokeLater` を使用して継続の実行をSwing UIスレッドにディスパッチします。
 
 ```kotlin
 private class SwingContinuation<T>(val cont: Continuation<T>) : Continuation<T> by cont {
@@ -586,9 +574,7 @@ private class SwingContinuation<T>(val cont: Continuation<T>) : Continuation<T> 
 }
 ```
 
-Then define `Swing` object that is going to serve as the corresponding context element and implement
-`ContinuationInterceptor` interface:
-次にSwing、対応するコンテキスト要素として機能するオブジェクトを定義し、インタフェースを ContinuationInterceptor実装します。
+次に、対応するコンテキスト要素として機能する `Swing` オブジェクトを定義し、` ContinuationInterceptor` インタフェースを実装します。
   
 ```kotlin
 object Swing : AbstractCoroutineContextElement(ContinuationInterceptor), ContinuationInterceptor {
@@ -597,20 +583,14 @@ object Swing : AbstractCoroutineContextElement(ContinuationInterceptor), Continu
 }
 ```
 
-> You can get this code [here](examples/context/swing.kt).
-  Note: the actual implementation of `Swing` object in [kotlinx.coroutines](https://github.com/kotlin/kotlinx.coroutines) 
-  also supports coroutine debugging facilities that provide and display the identifier of the currently running 
-  coroutine in the name of the thread that is currently running this coroutine.
-ここでこのコードを入手できます。注意：kotlinx.coroutinesのSwingオブジェクトの実際の実装で は、現在実行中のコルーチンの識別子を提供し、現在このコルーチンを実行しているスレッドの名前で表示するコルーチンデバッグ機能もサポートされています。
+> [ここ](examples/context/swing.kt)でこのコードを入手できます。
+注意：[kotlinx.coroutines](https://github.com/kotlin/kotlinx.coroutines)の実際の `Swing` オブジェクトの実装は、現在このコルーチンを実行しているスレッドの名前で現在実行中のコルーチンの識別子を提供して表示するコルーチンデバッグ機能もサポートしています。
 
-Now, one can use `launch{}` [coroutine builder](#coroutine-builders) with `Swing` parameter to 
-execute a coroutine that is running completely in Swing event dispatch thread:
-今では、launch{} Coroutine builderをSwingパラメータとともに使用して、Swingイベントディスパッチスレッドで完全に実行されているコルーチンを実行できます。
+さて、完全にSwingイベントディスパッチスレッドで実行されているコルーチンを実行するために、 `launch{}` [コルーチンビルダー](#コルーチンビルダー)と `Swing` パラメータを使用することができます
  
- ```kotlin
+```kotlin
 launch(Swing) {
-   // code in here can suspend, but will always resume in Swing EDT
-   // ここのコードは中断できますが、常にSwing EDTで再開します 
+   // ここのコードは中断できますが、常にSwing EDTで再開します
 }
 ```
 
