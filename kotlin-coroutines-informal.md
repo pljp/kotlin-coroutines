@@ -594,11 +594,10 @@ launch(Swing) {
 }
 ```
 
-### Restricted suspension 制限付きサスペンション
+### 制限付きサスペンド
 
-A different kind of coroutine builder and suspension function is needed to implement `buildSequence{}` and `yield()`
-from [generators](#generators) use case. Here is the library code for `buildSequence{}` coroutine builder:
-実装するためにbuildSequence{}、そしてジェネレータのユースケースyield() から、異なる種類のコルーチンビルダーとサスペンション機能が必要です。コルーチンビルダーのライブラリコードは次のとおりです：buildSequence{}
+[ジェネレーター](#ジェネレーター)のユースケースから `buildSequence{}` と `yield()` を実装するには、異なる種類のコルーチンビルダーとサスペンド関数が必要です。
+以下は、`buildSequence{}` コルーチンビルダーのライブラリコードです。
 
 ```kotlin
 fun <T> buildSequence(block: suspend SequenceBuilder<T>.() -> Unit): Sequence<T> = Sequence {
@@ -608,14 +607,10 @@ fun <T> buildSequence(block: suspend SequenceBuilder<T>.() -> Unit): Sequence<T>
 }
 ```
 
-It uses a different primitive from the standard library called `createCoroutine` that _creates_ coroutine, 
-but does _not_ start it. Instead, it returns its _initial continuation_ as a reference to `Continuation<Unit>`. 
-The other difference is that _suspending lambda_
-`block` for this builder is an 
-[_extension lambda_](https://kotlinlang.org/docs/reference/lambdas.html#function-literals-with-receiver) 
-with `SequenceBuilder<T>` receiver.
-The `SequenceBuilder` interface provides the _scope_ for the generator block and is defined in a library as:
-これは、コルーチンcreateCoroutineを作成するが、起動しない標準ライブラリとは異なるプリミティブを使用します。代わりに、最初の継続を参照先として返しますContinuation<Unit>。もう1つの違いは、このビルダーのラムダ blockをサスペンドすることは 、レシーバを持つ 拡張ラムダでSequenceBuilder<T>あることです。SequenceBuilderインタフェースは、提供範囲を発電ブロックのために、ライブラリなどで定義されています。
+これは、コルーチンを_作成_する `createCoroutine` という標準ライブラリの異なるプリミティブを使用しますが、起動_しません_。
+代わりに、`Continuation<Unit>` への参照として_最初の継続_を返します。
+もう1つの違いは、このビルダーの_サスペンドラムダ_ `block` は `SequenceBuilder<T>` レシーバーを持つ[_拡張ラムダ_](http://dogwood008.github.io/kotlin-web-site-ja/docs/reference/lambdas.html#レシーバ付き関数リテラル)です。
+`SequenceBuilder` インターフェースは、ジェネレーターブロックの_スコープ_を提供し、ライブラリとして次のように定義されています。
 
 ```kotlin
 interface SequenceBuilder<in T> {
@@ -623,11 +618,8 @@ interface SequenceBuilder<in T> {
 }
 ```
 
-To avoid creation of multiple objects, `buildSequence{}` implementation defines `SequenceCoroutine<T>` class that
-implements `SequenceBuilder<T>` and also implements `Continuation<Unit>`, so it can serve both as
-a `receiver` parameter for `createCoroutine` and as its `completion` continuation parameter. 
-The simple implementation for `SequenceCoroutine<T>` is shown below:
-複数のオブジェクトの作成を避けるため、buildSequence{}インプリメンテーションはSequenceCoroutine<T>インプリメンテーションSequenceBuilder<T>とインプリメントも行うクラスを定義Continuation<Unit>するため、receiver継続パラメータのパラメータcreateCoroutineとしてもcompletion継続パラメータとしても機能します。の簡単な実装を以下SequenceCoroutine<T>に示します：
+複数のオブジェクトの作成を避けるため、`buildSequence {}`実装は `SequenceBuilder<T>` を実装する `SequenceCoroutine <T>` クラスを定義し、`Continuation<Unit>` も実装していますので、`createCoroutine` の `receiver` パラメータ としても `completion` 継続パラメータとしても機能します。
+`SequenceCoroutine<T>` の単純な実装を以下に示します。
 
 ```kotlin
 private class SequenceCoroutine<T>: AbstractIterator<T>(), SequenceBuilder<T>, Continuation<Unit> {
@@ -649,21 +641,15 @@ private class SequenceCoroutine<T>: AbstractIterator<T>(), SequenceBuilder<T>, C
 }
 ```
  
-> You can get this code [here](examples/sequence/buildSequence.kt)
-ここでこのコードを入手できます
+> [ここ](examples/sequence/buildSequence.kt)でこのコードを入手できます
 
-The implementation of `yield` uses `suspendCoroutine` [suspending function](#suspending-functions) to suspend
-the coroutine and to capture its continuation. Continuation is stored as `nextStep` to be resumed when the 
-`computeNext` is invoked.
-コルーチンを中断し、その継続を捕捉するための機能停止をyield使用する。継続が呼び出されると、継続が再開されるように 格納されます。suspendCoroutine nextStepcomputeNext
+`yield`の実装は `suspendCoroutine` [サスペンド関数](#サスペンド関数)を使ってコルーチンを中断し、その継続を捕捉します。
+`computeNext` が呼び出されると、継続は `nextStep` として保存され、再開されます。
  
-However, `buildSequence{}` and `yield()`, as shown above, are not ready for an arbitrary suspending function
-to capture the continuation in their scope. They work _synchronously_.
-They need absolute control on how continuation is captured, 
-where it is stored, and when it is resumed. They form _restricted suspension scope_. 
-The ability to restrict suspensions is provided by `@RestrictsSuspension` annotation that is placed
-on the scope class or interface, in the above example this scope interface is `SequenceBuilder`:
-しかし、buildSequence{}上yield()で示したように、任意の中断機能がその範囲内で継続をキャプチャする準備ができていません。それらは同期して動作します。継続をどのようにキャプチャし、どこに格納し、いつ再開するかを絶対的に制御する必要があります。制限されたサスペンションスコープを形成します。サスペンドを制限する機能@RestrictsSuspensionは、スコープクラスまたはインターフェイスに配置された注釈によって提供されます。上の例では、このスコープインターフェイスはSequenceBuilder次のとおりです。
+しかし、上に示した `buildSequence{}` と `yield()` は、任意のサスペンド関数がそのスコープ内の継続を捕捉する準備ができていません。それらは_同期_して動作します。
+継続をどのようにキャプチャし、どこに格納し、いつ再開するかを絶対的に制御する必要があります。
+_制限付きサスペンションスコープ_を形成します。
+サスペンションを制限する機能は、スコープクラスまたはインタフェースに配置された `@RestrictsSuspension` アノテーションによって提供されます。上記の例では、このスコープインタフェースは `SequenceBuilder` です。
 
 ```kotlin
 @RestrictsSuspension
@@ -672,19 +658,12 @@ interface SequenceBuilder<in T> {
 }
 ```
 
-This annotation enforces certain restrictions on suspending functions that can be used in the
-scope of `SequenceBuilder{}` or similar synchronous coroutine builder.
-Any extension suspending lambda or function that has _restricted suspension scope_ class or interface 
-(marked with `@RestrictsSuspension`) as its receiver is 
-called a _restricted suspending function_.
-Restricted suspending functions can only invoke member or
-extension suspending functions on the same instance of their restricted suspension scope. 
-In particular, it means that
-no `SequenceBuilder` extension of lambda in its scope can invoke `suspendContinuation` or other
-general suspending function. To suspend the execution of a `generate` coroutine they must ultimately invoke
-`SequenceBuilder.yield`. The implementation of `yield` itself is a member function of `Generator`
-implementation and it does not have any restrictions (only _extension_ suspending lambdas and functions are restricted).
-この注釈では、SequenceBuilder{}同期コルーチン構築ツールのスコープまたは同様のコルーチン構築ツールで使用できる一時停止機能に一定の制限が適用されます。制限されたサスペンススコープクラスまたはインターフェイス（マークされている@RestrictsSuspension）を受信者として持つラムダまたは関数を中断する拡張子は、制限された中断関数と呼ばれます。制限された中断機能は、制限された中断範囲の同じインスタンスでメンバ機能または拡張機能を呼び出すことしかできません。特にSequenceBuilder、そのスコープ内のラムダの拡張が呼び出せないsuspendContinuation、または他の一般的な中断機能が呼び出せないことを意味します。コルーチンの実行を中断するには、最終的にgenerate呼び出さなければなりません SequenceBuilder.yield。yieldGenerator
+この注釈は、`SequenceBuilder{}` または同様の同期コルーチンビルダーのスコープで使用できるサスペンド関数に一定の制限を適用します。
+_制限付きサスペンションスコープ_のクラスまたはインタフェース（`@RestrictsSuspension` でマークされている）をレシーバーとして持つサスペンドラムダまたはサスペンド関数の拡張は、_制限付きサスペンド関数_と呼ばれます。
+制限付きサスペンド関数は、同じ制限付きサスペンションスコープのインスタンスの中でのみメンバ関数または拡張関数を呼び出すことができます。
+具体的には、スコープ内のラムダの `SequenceBuilder` 拡張が `suspendContinuation` やその他の一般的なサスペンド関数を呼び出せないことを意味します。
+`generate` コルーチンの実行を中断するには、最終的に `SequenceBuilder.yield` を呼び出さなければなりません。
+`yield` 自体の実装は `Generator` 実装のメンバー関数であり、何の制約もありません（_拡張_サスペンドラムダと関数のみ制限があります）。
 
 It makes little sense to support arbitrary contexts for such a restricted coroutine builder as `sequenceBuilder`
 so it is hardcoded to always work with `EmptyCoroutineContext`.
