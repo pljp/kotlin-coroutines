@@ -665,33 +665,25 @@ _制限付きサスペンションスコープ_のクラスまたはインタフ
 `generate` コルーチンの実行を中断するには、最終的に `SequenceBuilder.yield` を呼び出さなければなりません。
 `yield` 自体の実装は `Generator` 実装のメンバー関数であり、何の制約もありません（_拡張_サスペンドラムダと関数のみ制限があります）。
 
-It makes little sense to support arbitrary contexts for such a restricted coroutine builder as `sequenceBuilder`
-so it is hardcoded to always work with `EmptyCoroutineContext`.
-そのような限定されたコルーチンビルダーのために任意のコンテキストをサポートするのはほとんど意味がないsequenceBuilder ので、常に動作するようにハードコードされていEmptyCoroutineContextます。
+これは `sequenceBuilder` のような制限されたコルーチンビルダーのために任意のコンテキストをサポートすることはほとんど意味がないので、常に `EmptyCoroutineContext` で動作するようにハードコードされています。
 
-## More examples
+## その他の例
 
-This is a non-normative section that does not introduce any new language constructs or 
-library functions, but shows how all the building blocks compose to cover a large variety
-of use-cases.
 これは、新しい言語構造やライブラリ関数を導入しない非規範的なセクションですが、すべてのビルディングブロックがどのようにさまざまなユースケースをカバーするように構成されているかを示しています。
 
-### Wrapping callbacks
+### コールバックのラッピング
 
-Many asynchronous APIs have callback-style interfaces. The `suspendCoroutine` suspending function 
-from the standard library provides for an easy way to wrap any callback into a Kotlin suspending function. 
-多くの非同期APIには、コールバックスタイルのインターフェイスがあります。suspendCoroutine標準ライブラリから吊り機能はKotlinサスペンド機能に任意のコールバックをラップするための簡単な方法を提供します。
+多くの非同期APIには、コールバックスタイルのインターフェイスがあります。
+標準ライブラリの `suspendCoroutine`サスペンド関数は、コールバックをKotlinサスペンド関数に簡単にラップする方法を提供します。
 
-There is a simple pattern. Assume that you have `someLongComputation` function with callback that 
-receives `Result` of this computation.
-単純なパターンがあります。この計算someLongComputationを受け取るコールバックを持つ関数があると仮定してくださいResult。
+単純なパターンがあります。
+この計算の `Result` を受け取るコールバックを持つ `someLongComputation` 関数があるとします。
 
 ```kotlin
 fun someLongComputation(params: Params, callback: (Result) -> Unit)
 ```
 
-You can convert it into a suspending function with the following straightforward code:
-以下の簡単なコードを使用して、サスペンド機能に変換することができます。
+以下の簡単なコードを使用して、サスペンド関数に変換することができます。
  
 ```kotlin
 suspend fun someLongComputation(params: Params): Result = suspendCoroutine { cont ->
@@ -699,17 +691,10 @@ suspend fun someLongComputation(params: Params): Result = suspendCoroutine { con
 } 
 ```
 
-Now the return type of this computation is explicit, but it is still asynchronous and does not block a thread.
 現在、この計算の戻り値の型は明示的ですが、依然として非同期であり、スレッドをブロックしません。
 
-For a more complex example let us take a look at
-`aRead()` function from [asynchronous computations](#asynchronous-computations) use case. 
-It can be implemented as a suspending extension function for Java NIO 
-[`AsynchronousFileChannel`](https://docs.oracle.com/javase/8/docs/api/java/nio/channels/AsynchronousFileChannel.html)
-and its 
-[`CompletionHandler`](https://docs.oracle.com/javase/8/docs/api/java/nio/channels/CompletionHandler.html)
-callback interface with the following code:
-もっと複雑な例aRead()として、非同期計算のユースケースから関数を見てみましょう 。これは 、次のコードを使用して、Java NIO AsynchronousFileChannel およびその CompletionHandlerコールバックインタフェースのサスペンド拡張機能として実装 できます。
+もっと複雑な例として、[非同期計算](#非同期計算)のユースケースから `aRead()` 関数を見てみましょう。
+これは、Java NIO [`AsynchronousFileChannel`](http://docs.oracle.com/javase/jp/8/docs/api/java/nio/channels/AsynchronousFileChannel.html) と [`CompletionHandler`](http://docs.oracle.com/javase/jp/8/docs/api/java/nio/channels/CompletionHandler.html) コールバックインタフェースのためのサスペンド拡張関数として次のコードで実装できます。
 
 ```kotlin
 suspend fun AsynchronousFileChannel.aRead(buf: ByteBuffer): Int =
@@ -726,17 +711,12 @@ suspend fun AsynchronousFileChannel.aRead(buf: ByteBuffer): Int =
     }
 ```
 
-> You can get this code [here](examples/io/io.kt).
-  Note: the actual implementation in [kotlinx.coroutines](https://github.com/kotlin/kotlinx.coroutines)
-  supports cancellation to abort long-running IO operations.
-ここでこのコードを入手できます。注：内の実際の実装kotlinx.coroutinesは 長時間実行IO操作を中止するキャンセルをサポートしています。
+> [ここ](examples/io/io.kt)でこのコードを入手できます。
+注意：[kotlinx.coroutines](https://github.com/kotlin/kotlinx.coroutines)の実際の実装では、長時間実行されるIO操作を中止するための取り消しがサポートされています。
 
-If you are dealing with lots of functions that all share the same type of callback, then you can define a common
-wrapper function to easily convert all of them to suspending functions. For example, 
-[vert.x](http://vertx.io/) uses a particular convention that all its asynchronous functions receive 
-`Handler<AsyncResult<T>>` as a callback. To simply the use of arbitrary vert.x functions from coroutines
-the following helper function can be defined:
-すべて同じ型のコールバックを共有するたくさんの関数を扱っている場合は、共通のラッパー関数を定義してそれらをすべて一時停止機能に簡単に変換することができます。たとえば、 vert.xでは、すべての非同期Handler<AsyncResult<T>>関数がコールバックとして受け取るという特定の規約が 使用されています。コルーチンからの任意のvert.x関数の単純な使用には、以下のヘルパー関数を定義することができます。
+すべて同じ型のコールバックを共有するたくさんの関数を扱っている場合は、共通のラッパー関数を定義してそれらをすべてサスペンド関数に簡単に変換することができます。
+たとえば、[vert.x](http://vertx.io/)は、すべての非同期関数がコールバックとして `Handler<AsyncResult<T>` を受け取るという特定の規約を使用します。
+コルーチンから簡単に任意のvert.x関数を使用するには、以下のヘルパー関数を定義することができます。
 
 ```kotlin
 inline suspend fun <T> vx(crossinline callback: (Handler<AsyncResult<T>>) -> Unit) = 
@@ -751,30 +731,19 @@ inline suspend fun <T> vx(crossinline callback: (Handler<AsyncResult<T>>) -> Uni
     }
 ```
 
-Using this helper function, an arbitrary asynchronous vert.x function `async.foo(params, handler)`
-can be invoked from a coroutine with `vx { async.foo(params, it) }`.
-このヘルパー関数を使用すると、任意の非同期vert.x関数async.foo(params, handler) をコルーチンから呼び出すことができvx { async.foo(params, it) }ます。
+このヘルパー関数を使うと、任意の非同期vert.x関数 `async.foo(params、handler)` を `vx { async.foo(params, it) }` でコルーチンから呼び出すことができます。
 
-### Building futures
+### futureの作成
 
-The `future{}` builder from [futures](#futures) use-case can be defined for any future or promise primitive
-similarly to the `launch{}` builder as explained in [coroutine builders](#coroutine-builders) section:
-future{}ビルダー先物はユースケースは、任意の将来のために定義されるか、または同様にプリミティブを約束することが可能launch{}で説明したようにビルダーコルーチンビルダーのセクション：
+[future](#futures)ユースケースの `future{}` ビルダーは、[コルーチンビルダー](#コルーチンビルダー)のセクションで説明したように、futureまたはpromiseプリミティブに対して `launch{}` ビルダーと同様に定義することができます。
 
 ```kotlin
 fun <T> future(context: CoroutineContext = CommonPool, block: suspend () -> T): CompletableFuture<T> =
         CompletableFutureCoroutine<T>(context).also { block.startCoroutine(completion = it) }
 ```
 
-The first difference from `launch{}` is that it returns an implementation of
-[`CompletableFuture`](https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/CompletableFuture.html), 
-and the other difference is that it is defined with a default `CommonPool` context, so that its default
-execution behaviour is similar to the 
-[`CompletableFuture.supplyAsync`](https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/CompletableFuture.html#supplyAsync-java.util.function.Supplier-)
-method that runs its code in 
-[`ForkJoinPool.commonPool`](https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ForkJoinPool.html#commonPool--).
-The basic implementation of `CompletableFutureCoroutine` is straightforward:
-最初の相違点launch{}は、それが実装を返すこと CompletableFutureと、それがデフォルトのCommonPoolコンテキストで定義されて、そのデフォルトのCompletableFuture.supplyAsync 実行動作がコードを実行するメソッドに似ている こと ForkJoinPool.commonPoolです。の基本的な実装CompletableFutureCoroutineは簡単です：
+`launch{}` との最初の違いは [`CompletableFuture`](http://docs.oracle.com/javase/jp/8/docs/api/java/util/concurrent/CompletableFuture.html) の実装を返すことです。もう一つの違いはデフォルトの `CommonPool` コンテキストで定義されているため、デフォルトの実行動作は [`ForkJoinPool.commonPool`](http://docs.oracle.com/javase/jp/8/docs/api/java/util/concurrent/ForkJoinPool.html#commonPool--) でコードを実行する [`CompletableFuture.supplyAsync`](http://docs.oracle.com/javase/jp/8/docs/api/java/util/concurrent/CompletableFuture.html#supplyAsync-java.util.function.Supplier-) メソッドと似ています。
+`CompletableFutureCoroutine` の基本的な実装は簡単です。
 
 ```kotlin
 class CompletableFutureCoroutine<T>(override val context: CoroutineContext) : CompletableFuture<T>(), Continuation<T> {
@@ -783,21 +752,12 @@ class CompletableFutureCoroutine<T>(override val context: CoroutineContext) : Co
 }
 ```
 
-> You can get this code [here](examples/future/future.kt).
-  The actual implementation in [kotlinx.coroutines](https://github.com/kotlin/kotlinx.coroutines) is more advanced,
-  because it propagates the cancellation of the resulting future to cancel the coroutine.
-ここでこのコードを入手できます。で実際の実装kotlinx.coroutinesは、それがコルーチンをキャンセルする結果として、将来の取り消しを伝播するため、より高度です。
+このコルーチンの完了は、このコルーチンの結果を記録するため、futureの対応する `complete` メソッドを呼び出します。
 
-The completion of this coroutine invokes the corresponding `complete` methods of the future to record the
-result of this coroutine.
-このコルーチンの完成は、このコルーチンのcomplete結果を記録する、将来の対応する方法を呼び出す。
+### ノンブロッキングスリープ
 
-### Non-blocking sleep
-
-Coroutines should not use [`Thread.sleep`](https://docs.oracle.com/javase/8/docs/api/java/lang/Thread.html#sleep-long-),
-because it blocks a thread. However, it is quite straightforward to implement a suspending non-blocking `delay` function by using
-Java's [`ScheduledThreadPoolExecutor`](https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ScheduledThreadPoolExecutor.html)
-コルーチンはThread.sleepスレッドをブロックするので使用しないでください。ただし、delayJavaの関数を使用して非ブロッキング関数を一時停止することは、非常に簡単です。ScheduledThreadPoolExecutor
+コルーチンでは、スレッドをブロックする [`Thread.sleep`](https://docs.oracle.com/javase/jp/8/docs/api/java/lang/Thread.html#sleep-long-) は使うべきではありません。
+しかし、Javaの [`ScheduledThreadPoolExecutor`](https://docs.oracle.com/javase/jp/8/docs/api/java/util/concurrent/ScheduledThreadPoolExecutor.html) を使用して、ノンブロッキングの `delay` サスペンド関数を実装するのは非常に簡単です。
 
 ```kotlin
 private val executor = Executors.newSingleThreadScheduledExecutor {
@@ -809,21 +769,22 @@ suspend fun delay(time: Long, unit: TimeUnit = TimeUnit.MILLISECONDS): Unit = su
 }
 ```
 
-> You can get this code [here](examples/delay/delay.kt).
-  Node: [kotlinx.coroutines](https://github.com/kotlin/kotlinx.coroutines) also provides `delay` function.
-ここでこのコードを入手できます。ノード：kotlinx.coroutinesはdelay関数も提供します。
+> [ここ](examples/delay/delay.kt)でこのコードを入手できます。
+注：[kotlinx.coroutines](https://github.com/kotlin/kotlinx.coroutines)は `delay` 関数も提供します。
 
-Note, that this kind of `delay` function resumes the coroutines that are using it in its single "scheduler" thread.
-The coroutines that are using [interceptor](#continuation-interceptor) like `Swing` will not stay to execute in this thread,
-as their interceptor dispatches them into an appropriate thread. Coroutines without interceptor will stay to execute
-in this scheduler thread. So this solution is convenient for demo purposes, but it is not the most efficient one. It
-is advisable to implement sleep natively in the corresponding interceptors.
-この種のdelay関数は、単一の「スケジューラー」スレッドでそれを使用しているコルーチンを再開することに注意してください。インターセプタのようなものSwingを使用しているコルーチンは、インターセプタが適切なスレッドにディスパッチするので、このスレッドでは実行されません。インターセプタを持たないコルーチンは、このスケジューラのスレッドで実行されたままになります。このソリューションはデモの目的には便利ですが、最も効率的な方法ではありません。対応するインターセプタでネイティブにスリープを実装することをお勧めします。
+この種の `delay` 関数は、単一の「スケジューラー」スレッドでコルーチンを再開することに注意してください。
+`Swing` のような[インターセプター](#継続インターセプター)を使用しているコルーチンは、インターセプターが適切なスレッドにディスパッチするので、このスレッドでは実行されません。
+インターセプターを持たないコルーチンは、このスケジューラーのスレッドで実行されたままになります。
+このソリューションはデモの目的には便利ですが、最も効率的な方法ではありません。
+対応するインターセプターでネイティブにスリープを実装することをお勧めします。
 
 For `Swing` interceptor that native implementation of non-blocking sleep shall use
 [Swing Timer](https://docs.oracle.com/javase/8/docs/api/javax/swing/Timer.html)
 that is specifically designed for this purpose:
+
 以下のためのSwing非ブロッキング睡眠のネイティブ実装を使用しなければならないことを迎撃 スイングタイマー この目的のために特別に設計されています：
+
+`Swing` インターセプターの場合、ノンブロッキングスリープのネイティブ実装では、この目的のために特別に設計された[Swing Timer](https://docs.oracle.com/javase/jp/8/docs/api/javax/swing/Timer.html)を使用します。
 
 ```kotlin
 suspend fun Swing.delay(millis: Int): Unit = suspendCoroutine { cont ->
@@ -834,29 +795,17 @@ suspend fun Swing.delay(millis: Int): Unit = suspendCoroutine { cont ->
 }
 ```
 
-> You can get this code [here](examples/context/swing-delay.kt).
-  Node: [kotlinx.coroutines](https://github.com/kotlin/kotlinx.coroutines) implementation of `delay` is aware of
-  interceptor-specific sleep facilities and automatically uses the above approach where appropriate. 
-ここでこのコードを入手できます。ノード：kotlinx.coroutinesの実装はdelay、インターセプタ固有のスリープ機能を認識し、適切な場合には上記の方法を自動的に使用します。
+> [ここ](examples/context/swing-delay.kt)でこのコードを入手できます。
+注：[kotlinx.coroutines](https://github.com/kotlin/kotlinx.coroutines)の `delay`の実装は、インターセプター固有のスリープ機能を認識し、適切な場合には上記の方法を自動的に使用します。
 
-### Cooperative single-thread multitasking
+### 協調シングルスレッドマルチタスキング
 
-It is very convenient to write cooperative single-threaded applications, because you don't have to 
-deal with concurrency and shared mutable state. JS, Python and many other languages do 
-not have threads, but have cooperative multitasking primitives.
 同時実行性と共有可能な可変状態を処理する必要がないので、協調型シングルスレッドアプリケーションを作成するのが非常に便利です。JS、Python、その他多くの言語はスレッドを持ちませんが、協調的なマルチタスキングプリミティブを持っています。
 
-[Coroutine interceptor](#coroutine-interceptor) provides a straightforward tool to ensure that
-all coroutines are confined to a single thread. The example code
-[here](examples/context/threadContext.kt) defines `newSingleThreadContext()` function that
-creates a single-threaded execution services and adapts it to the coroutine interceptor
-requirements.
-Coroutineインターセプタは、すべてのコルーチンが1つのスレッドに限定されるようにするための簡単なツールを提供します。ここのサンプルコード ではnewSingleThreadContext()、シングルスレッド実行サービスを作成し、それをコルーチンインターセプタの要件に適合させる関数を定義しています。
+[コルーチンインターセプター](#コルーチンインターセプター)は、すべてのコルーチンが1つのスレッドに限定されるようにするための簡単なツールを提供します。
+[ここ](examples/context/threadContext.kt)のサンプルコードでは、シングルスレッド実行サービスを作成し、それをコルーチンインターセプターの要件に適合させる `newSingleThreadContext()` 関数を定義しています。
 
-We will use it with `future{}` coroutine builder that was defined in [building futures](#building-futures) section
-in the following example that works in a single thread, despite the
-fact that it has two asynchronous tasks inside that are both active.
-両方のアクティブな内部に2つの非同期タスクが存在するにもかかわらず、単一のスレッドで動作する次の例の先物セクションをfuture{}作成する際に定義されたコルーチン構築ツールで使用します。
+以下は、内部にアクティブな2つの非同期タスクを持っているにもかかわらず単一のスレッドで動作する例です。[futureの作成](#futureの作成)セクションで定義された `future{}` コルーチンビルダーでこれを使用します。
 
 ```kotlin
 fun main(args: Array<String>) {
@@ -885,31 +834,20 @@ fun main(args: Array<String>) {
 }
 ```
 
-> You can get fully working example [here](examples/context/threadContext-example.kt).
-  Node: [kotlinx.coroutines](https://github.com/kotlin/kotlinx.coroutines) has ready-to-use implementation of
-  `newSingleThreadContext`. 
-ここで完全に動作する例を得ることができます。ノード：kotlinx.coroutinesにはすぐに使用できる実装があり newSingleThreadContextます。
+> [ここ](examples/context/threadContext-example.kt)で完全に動作する例を得ることができます。
+注：[kotlinx.coroutines](https://github.com/kotlin/kotlinx.coroutines)には、`newSingleThreadContext` のすぐに使える実装があります。
 
-If your whole application is based on a single-threaded execution, you can define your own helper coroutine
-builders with a hardcoded context for your single-threaded execution facilities.
 アプリケーション全体がシングルスレッド実行に基づいている場合は、シングルスレッド実行機能用のハードコーディングされたコンテキストを持つ独自のヘルパーコルーチンビルダーを定義できます。
   
-## Asynchronous sequences
+### 非同期シーケンス
 
-The `buildSequence{}` coroutine builder that is shown in [restricted suspension](#restricted-suspension)
-section is an example of a _synchronous_ coroutine. Its producer code in the coroutine is invoked
-synchronously in the same thread as soon as its consumer invokes `Iterator.next()`. 
-The `buildSequence{}` coroutine block is restricted and it cannot suspend its execution using 3rd-party suspending
-functions like asynchronous file IO as shown in [wrapping callbacks](#wrapping-callbacks) section.
-buildSequence{}示されているコルーチンビルダー制限サスペンション セクションは一例である同期コルーチン。コルーチンのプロデューサコードは、コンシューマが呼び出すと同時に同じスレッドで同期的に呼び出されますIterator.next()。buildSequence{}コルーチンブロックが制限され、に示すように、非同期ファイルIOのようなサードパーティ製吊り機能を使用してその実行を一時停止することはできませんコールバックのラッピングセクションを。
+[制限付きサスペンド](#制限付きサスペンド)セクションに示されている `buildSequence{}` コルーチンビルダーは、_同期_コルーチンの例です。
+コルーチンのプロデューサーコードは、コンシューマーが `Iterator.next()` を呼び出すと同時に同じスレッドで同期的に呼び出されます。
+`buildSequence{}` コルーチンブロックは制限されており、[コールバックのラッピング](#コールバックのラッピング)セクションに示すように、非同期ファイルIOのようなサードパーティのサスペンド関数を使って実行を中断することはできません。
 
-An _asynchronous_ sequence builder is allowed to arbitrarily suspend and resume its execution. It means
-that its consumer shall be ready to handle the case, when the data is not produced yet. This is
-a natural use-case for suspending functions. Let us define `SuspendingIterator` interface that is
-similar to a regular 
-[`Iterator`](https://kotlinlang.org/api/latest/jvm/stdlib/kotlin.collections/-iterator/) 
-interface, but its `next()` and `hasNext()` functions are suspending:
-非同期シーケンスビルダーは、任意に、その実行を中断し、再開することが許可されています。データがまだ作成されていない場合、その消費者はそのケースを処理する準備ができていることを意味します。これは機能を一時停止するための自然な使用例です。SuspendingIterator通常のIterator インターフェースに似たインターフェースを 定義しましょうが、そのインターフェースnext()とhasNext()機能は一時停止しています：
+_非同期_シーケンスビルダーは、その実行を任意に中断して再開することができます。
+データがまだ作成されていない場合、そのコンシューマーはそのケースを処理する準備ができていることを意味します。
+これはサスペンド関数の自然な使用例です。通常の [`Iterator`](https://kotlinlang.org/api/latest/jvm/stdlib/kotlin.collections/-iterator/)インタフェースに似た `SuspendingIterator` インタフェースを定義しましょう。ただし、`next()` と `hasNext()` 関数は中断できます。
  
 ```kotlin
 interface SuspendingIterator<out T> {
@@ -918,10 +856,7 @@ interface SuspendingIterator<out T> {
 }
 ```
 
-The definition of `SuspendingSequence` is similar to the standard
-[`Sequence`](https://kotlinlang.org/api/latest/jvm/stdlib/kotlin.sequences/-sequence/index.html)
-but it returns `SuspendingIterator`:
-定義はSuspendingSequence標準と似ています Sequence が、次のようになりますSuspendingIterator。
+[`Sequence`](https://kotlinlang.org/api/latest/jvm/stdlib/kotlin.sequences/-sequence/index.html) と似ていますが、`SuspendingIterator` を返します。
 
 ```kotlin
 interface SuspendingSequence<out T> {
@@ -929,9 +864,7 @@ interface SuspendingSequence<out T> {
 }
 ```
 
-We also define a scope interface for that is similar to a scope of a synchronous sequence builder,
-but it is not restricted in its suspensions:
-また、同期シーケンスビルダのスコープに似ているスコープインターフェイスを定義しますが、その中断は制限されていません。
+また、同期シーケンスビルダーのスコープに似ているスコープインターフェイスを定義しますが、その中断は制限されていません。
 
 ```kotlin
 interface SuspendingSequenceBuilder<in T> {
@@ -939,10 +872,8 @@ interface SuspendingSequenceBuilder<in T> {
 }
 ```
 
-The builder function `suspendingSequence{}` is similar to a synchronous `generate{}`.
-Their differences lie in implementation details of `SuspendingIteratorCoroutine` and
-in the fact that it makes sense to accept an optional context in this case:
-ビルダー関数suspendingSequence{}は、同期関数に似ていgenerate{}ます。それらの違いは実装の詳細とSuspendingIteratorCoroutine、この場合はオプションのコンテキストを受け入れることが理にかなっています
+ビルダー関数 `suspendingSequence{}` は同期 `generate{}` に似ています。
+それらの違いは、`SuspendingIteratorCoroutine` の実装の詳細と、この場合はオプションのコンテキストを受け入れることが理にかなっていることです。
 
 ```kotlin
 fun <T> suspendingSequence(
@@ -954,18 +885,11 @@ fun <T> suspendingSequence(
 }
 ```
 
-> You can get full code [here](examples/suspendingSequence/suspendingSequence.kt).
-  Note: [kotlinx.coroutines](https://github.com/kotlin/kotlinx.coroutines) has an implementation of
-  `Channel` primitive with the corresponding `produce{}` coroutine builder that provides more 
-  flexible implementation of the same concept.
-ここでフルコードを取得できます。注：kotlinx.coroutinesは 、同じコンセプトのより柔軟な実装を提供Channelする対応するproduce{}コルーチンビルダーとのプリミティブの実装を備えています。
+> [ここ](examples/suspendingSequence/suspendingSequence.kt)で完全なコードを取得できます。
+注：[kotlinx.coroutines](https://github.com/kotlin/kotlinx.coroutines)には、同じコンセプトのより柔軟な実装を提供する、`Channel`プリミティブと対応する `produce{}` コルーチンビルダーの実装があります。
 
-Let us take `newSingleThreadContext{}` context from
-[cooperative single-thread multitasking](#cooperative-single-thread-multitasking) section
-and non-blocking `delay` function from [non-blocking sleep](#non-blocking-sleep) section.
-This way we can write an implementation of a non-blocking sequence that yields
-integers from 1 to 10, sleeping 500 ms between them:
-協調的なシングルスレッドのマルチタスクセクションとノンブロッキングスリープセクションからノンブロッキング機能へのnewSingleThreadContext{}コンテキストを 取ってみましょう。このようにして、非ブロッキングシーケンスの実装を書くことができます.1から10までの整数が得られ、それらの間に500msのスリープがあります。delay
+[協調シングルスレッドマルチタスキング](#協調シングルスレッドマルチタスキング)セクションから `newSingleThreadContext{}` コンテキストを、[ノンブロッキングスリープ](#ノンブロッキングスリープ)セクションからノンブロッキング `delay` 関数を取り出しましょう。
+このようにして、1から10までの整数が得られ、それらの間に500msのスリープがあるノンブロッキングシーケンスの実装を書くことができます。
  
 ```kotlin
 val seq = suspendingSequence(context) {
@@ -976,31 +900,22 @@ val seq = suspendingSequence(context) {
 }
 ```
    
-Now the consumer coroutine can consume this sequence at its own pace, while also 
-suspending with other arbitrary suspending functions. Note, that 
-Kotlin [for loops](https://kotlinlang.org/docs/reference/control-flow.html#for-loops)
-work by convention, so there is no need for a special `await for` loop construct in the language.
-The regular `for` loop can be used to iterate over an asynchronous sequence that we've defined
-above. It is suspended whenever producer does not have a value:
-現在、消費者コルーチンは、このシーケンスを独自のペースで消費することができ、他の任意の中断機能も中断します。ループの ためのKotlin は慣例によって動作するのでawait for、言語の中で特別なループ構造は必要ありません。正規forループは、上で定義した非同期シーケンスを反復処理するために使用できます。プロデューサに値がない場合は一時停止されます。
-
+コンシューマーコルーチンは、このシーケンスを独自のペースで消費することができ、他の任意のサスペンド関数も中断します。
+注目すべきは、Kotlin [forループ](http://dogwood008.github.io/kotlin-web-site-ja/docs/reference/control-flow.html)は慣習的に動作するので、言語に特別な `await for` ループ構造は必要ないことです。
+通常の `for` ループは、上で定義した非同期シーケンスを反復するために使用できます。
+プロデューサーに値がない場合は中断されます。
 
 ```kotlin
-for (value in seq) { // suspend while waiting for producer //プロデューサーを待っている間に一時停止
-    // do something with value here, may suspend here, too
-    //すぎて、ここで停止することができ、ここでの値で何かを行います 
+for (value in seq) { //プロデューサーを待っている間に中断
+    // ここで値を使って何かする。ここでも中断するかもしれない。
 }
 ```
 
-> You can find a worked out example with some logging that illustrates the execution
-  [here](examples/suspendingSequence-example.kt)
-ここでの実行を説明するいくつかのログを使って、実際の例を見つけることができ ます
+> [ここ](examples/suspendingSequence/suspendingSequence-example.kt)で、実行を説明するログ出力を伴う実際の例を見つけることができます。
 
 ### Channels
 
-Go-style type-safe channels can be implemented in Kotlin as a library. We can define an interface for 
-send channel with suspending function `send`:
-Goスタイルのタイプセーフなチャンネルは、Kotlinでライブラリとして実装できます。サスペンド機能付きの送信チャネルのインタフェースを定義することができますsend。
+Goスタイルのタイプセーフなチャンネルは、Kotlinでライブラリとして実装できます。サスペンド関数 `send` として送信チャネルのインタフェースを定義することができます。
 
 ```kotlin
 interface SendChannel<T> {
@@ -1009,9 +924,7 @@ interface SendChannel<T> {
 }
 ```
   
-and receiver channel with suspending function `receive` and an `operator iterator` in a similar style 
-to [asynchronous sequences](#asynchronous-sequences):
-サスペンド機能receiveを備えoperator iteratorたレシーバチャネル、および非同期シーケンスと同様のスタイルの受信チャネル：
+そして、[非同期シーケンス](#非同期シーケンス)と同様のスタイルでサスペンド関数 `receive` と `operator iterator` を持つレシーバーチャネル、
 
 ```kotlin
 interface ReceiveChannel<T> {
@@ -1020,13 +933,10 @@ interface ReceiveChannel<T> {
 }
 ```
 
-The `Channel<T>` class implements both interfaces.
-The `send` suspends when the channel buffer is full, while `receive` suspends when the buffer is empty.
-It allows us to copy Go-style code into Kotlin almost verbatim.
-The `fibonacci` function that sends `n` fibonacci numbers in to a channel from
-[the 4th concurrency example of a tour of Go](https://tour.golang.org/concurrency/4)  would look 
-like this in Kotlin:
-Channel<T>クラスは、両方のインターフェイスを実装しています。send一時停止しながら、チャネル・バッファは、いっぱいになったときにreceiveバッファが空のときに一時停止します。Go-styleコードをほぼそのままKotlinにコピーすることができます。fibonacci送信機能nからチャネルへにフィボナッチ数を 囲碁のツアーの第四同時実行例 Kotlinに次のようになります。
+`Channel<T>` クラスは両方のインタフェースを実装しています。
+`send` はチャネルバッファーがいっぱいになると中断し、`receive` はバッファーが空の時に中断します。
+Go-styleコードをほぼそのままKotlinにコピーすることができます。
+Goのツアーの4番目の並行処理の例の、`n` 個のフィボナッチ数をチャネルに送信する `fibonacci` 関数は、Kotlinでは次のようになります。
 
 ```kotlin
 suspend fun fibonacci(n: Int, c: SendChannel<Int>) {
@@ -1043,16 +953,10 @@ suspend fun fibonacci(n: Int, c: SendChannel<Int>) {
 
 ```
 
-We can also define Go-style `go {...}` block to start the new coroutine in some kind of
-multi-threaded pool that dispatches an arbitrary number of light-weight coroutines onto a fixed number of 
-actual heavy-weight threads.
-The example implementation [here](examples/channel/go.kt) is trivially written on top of
-Java's common [`ForkJoinPool`](https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ForkJoinPool.html).
-我々はまた、ゴースタイルの定義することができgo {...}、実際の重いスレッドの固定数に軽量コルーチンの任意の数をディスパッチマルチスレッドプールのいくつかの種類に新しいコルーチンを開始するためにブロックを。ここの実装例は、Javaの共通の上に書かれていForkJoinPoolます。
+Goスタイルの `go {...}` ブロックを定義して、ある種のマルチスレッドプールで新しいコルーチンを開始することもできます。このコルーチンは、任意の数の軽量コルーチンを決まった数の実際の重いスレッドにディスパッチします。
+[ここ](examples/channel/go.kt)の実装例は、Javaの一般的な `ForkJoinPool` の上に書かれています。
 
-Using this `go` coroutine builder, the main function from the corresponding Go code would look like this,
-where `mainBlocking` is shortcut helper function for `runBlocking` with the same pool as `go{}` uses:
-このgoコルーチン構築ツールを使用すると、対応するGoコードのmain関数は次のようになります。ここでmainBlockingはrunBlocking、go{}使用と同じプールでのショートカットヘルパー関数があります。
+この `go` コルーチンビルダーを使用すると、対応するGoコードのmain関数は次のようになります。`mainBlocking` は `runBlocking` のためのショートカットヘルパー関数で、`go{}` と同じプールを使用します：
 
 ```kotlin
 fun main(args: Array<String>) = mainBlocking {
@@ -1064,20 +968,20 @@ fun main(args: Array<String>) = mainBlocking {
 }
 ```
 
-> You can checkout working code [here](examples/channel/channel-example-4.kt)
-ここで作業コードをチェックアウトすることができます
+> [ここ](examples/channel/channel-example-4.kt)で動作するコードをチェックアウトすることができます
 
-You can freely play with the buffer size of the channel. 
-For simplicity, only buffered channels are implemented in the example (with a minimal buffer size of 1), 
-because unbuffered channels are conceptually similar to [asynchronous sequences](#asynchronous-sequences)
-that were covered before.
-チャンネルのバッファーサイズで自由に演奏できます。単純化のために、バッファされていないチャネルは概念的 に前に説明した非同期シーケンスと類似しているため、この例ではバッファされたチャネルのみが実装されています（最小バッファサイズ1）。
+チャネルのバッファーサイズは自由にいじることができます。
+簡単にするため、バッファーされていないチャネルは概念的に前に説明した[非同期シーケンス](#非同期シーケンス)と類似しているため、この例ではバッファされたチャネルのみが実装されています（最小バッファサイズ1）。
 
 Go-style `select` control block that suspends until one of the actions becomes available on 
 one of the channels can be implemented as a Kotlin DSL, so that 
 [the 5th concurrency example of a tour of Go](https://tour.golang.org/concurrency/5)  would look 
 like this in Kotlin:
 selectアクションの1つがチャネルの1つで利用可能になるまで保留するGoスタイルの制御ブロックは、Kotlin DSLとして実装することができます。その ため、Goのツアーの5番目の並行処理の例は、 Kotlinでは次のようになります。
+
+Go-style `select` control block that suspends until one of the actions becomes available on one of the channels can be implemented as a Kotlin DSL, so that the 5th concurrency example of a tour of Go would look like this in Kotlin:
+
+アクションの1つがチャンネルの1つで利用可能になるまで停止するGoスタイルの `select` 制御ブロックは、Kotlin DSLとして実装することができ、[Goのツアーの5番目の並行処理の例](https://tour.golang.org/concurrency/5)は、Kotlinでは次のようになります。
  
 ```kotlin
 suspend fun fibonacci(c: SendChannel<Int>, quit: ReceiveChannel<Int>) {
@@ -1088,27 +992,21 @@ suspend fun fibonacci(c: SendChannel<Int>, quit: ReceiveChannel<Int>) {
             val next = x + y
             x = y
             y = next
-            true // continue while loop// whileループを継続する
+            true // whileループを継続する
         }
         quit.onReceive {
             println("quit")
-            false // break while loop//whileループを抜ける
+            false // whileループを抜ける
         }
     }
 }
 ```
 
-> You can checkout working code [here](examples/channel/channel-example-5.kt)
-ここで作業コードをチェックアウトすることができます
+> [ここ](examples/channel/channel-example-5.kt)で動作するコードをチェックアウトすることができます
   
-Example has an implementation of both `select {...}`, that returns the result of one of its cases like a Kotlin 
-[`when` expression](https://kotlinlang.org/docs/reference/control-flow.html#when-expression), 
-and a convenience `whileSelect { ... }` that is the same as `while(select<Boolean> { ... })` with fewer braces.
-例には、select {...}Kotlin when式のようなケースの結果を返す 両方の実装と、より少ない中カッコwhileSelect { ... }と同じような利便性がありwhile(select<Boolean> { ... })ます。
+例には、Kotlinの [`when` 式](http://dogwood008.github.io/kotlin-web-site-ja/docs/reference/control-flow.html#when式)のようにケースの1つを結果として返す `select {...}` と、中括弧の少ない `while(select<Boolean> { ... })` と同じ便利な `whileSelect { ... }` の両方の実装があります。
   
-The default selection case from [the 6th concurrency example of a tour of Go](https://tour.golang.org/concurrency/6) 
-just adds one more case into the `select {...}` DSL:
-Goのツアーの6番目の並行処理の例のデフォルトの選択例では、 もう1つのケースがselect {...}DSLに追加されます。
+[Goのツアーの6番目の並行処理の例](https://tour.golang.org/concurrency/6)のデフォルトの選択例では、もう1つのケースが `select {...}` DSLに追加されます。
 
 ```kotlin
 fun main(args: Array<String>) = mainBlocking {
@@ -1117,61 +1015,41 @@ fun main(args: Array<String>) = mainBlocking {
     whileSelect {
         tick.onReceive {
             println("tick.")
-            true // continue loop//ループを継続する
+            true // ループを継続する
         }
         boom.onReceive {
             println("BOOM!")
-            false // break loop
+            false // ループを抜ける
         }
         onDefault {
             println("    .")
             delay(50)
-            true // continue loop
+            true // ループを継続する
         }
     }
 }
 ```
 
-> You can checkout working code [here](examples/channel/channel-example-6.kt)
-ここで作業コードをチェックアウトすることができます
+> [ここ](examples/channel/channel-example-6.kt)で動作するコードをチェックアウトすることができます
 
-The `Time.tick` and `Time.after` are trivially implemented 
-[here](examples/channel/time.kt) with non-blocking `delay` function.
-Time.tickそしてTime.after自明実装されている ここでは非ブロッキングでdelay機能。
+`Time.tick` と `Time.after` は[ここ](examples/channel/time.kt)ではノンブロッキング `delay` 関数で簡単に実装されています。
   
-Other examples can be found [here](examples/channel/) together with the links to 
-the corresponding Go code in comments.
-その他の例は、コメント内の対応するGoコードへのリンクと共にここにあります。
+その他の例は、コメント内の対応するGoコードへのリンクと共に[ここ](examples/channel/)にあります。
 
-Note, that this sample implementation of channels is based on a single
-lock to manage its internal wait lists. It makes it easier to understand and reason about. 
-However, it never runs user code under this lock and thus it is fully concurrent. 
-This lock only somewhat limits its scalability to a very large number of concurrent threads.
-このチャネルの実装例は、内部待機リストを管理するための単一のロックに基づいていることに注意してください。これは、理解しやすくするための理由を簡単にします。ただし、このロックの下でユーザーコードを実行することはないため、完全に同時です。このロックは、スケーラビリティを非常に多数の同時スレッドに制限します。
+このチャネルの実装例は、内部待機リストを管理するための単一のロックに基づいていることに注意してください。これは、理解しやすく、理由を簡単にします。ただし、このロックの下でユーザーコードを実行することはないため、完全に同時です。このロックは、スケーラビリティを非常に多数の同時スレッドに制限します。
 
-> The actual implementation of channels and `select` in [kotlinx.coroutines](https://github.com/kotlin/kotlinx.coroutines) 
-  is based on lock-free disjoint-access-parallel data structures.
-チャンネルの実際の実装selectでkotlinx.coroutinesは ロックフリー互いに素アクセス並列データ構造に基づいています。
+> [kotlinx.coroutines](https://github.com/kotlin/kotlinx.coroutines)でのチャネルと `select` の実際の実装は、ロックフリーのdisjoint-access-parallelデータ構造に基づいています。
 
-This channel implementation is independent 
-of the interceptor in the coroutine context. It can be used in UI applications
-under an event-thread interceptor as shown in the
-corresponding [continuation interceptor](#continuation-interceptor) section, or with any other one, or without
-an interceptor at all (in the later case, the execution thread is determined solely by the code
-of the other suspending functions used in a coroutine).
-The channel implementation just provides thread-safe non-blocking suspending functions.
-このチャネルの実装は、コルーチンのコンテキストのインターセプタとは独立しています。これは、対応する継続インターセプタセクションに示されているように、イベントスレッドインターセプタの下でUIアプリケーションで使用することも、インターセプタをまったく使用しないこともできます（後で実行スレッドは、コルーチンに使用される他の中断機能）。チャネル実装は、スレッドセーフなノンブロッキング中断機能を提供するだけです。
-  
-### Mutexes
+このチャネルの実装は、コルーチンのコンテキストのインターセプターとは独立しています。
+これは、対応する継続インターセプターのセクションに示されているように、イベントスレッドインターセプターの下でUIアプリケーションで使用することも、他のインターセプターで使用することも、インターセプターをまったく使用しないこともできます（後者の場合、実行スレッドは、コルーチンで使用される他のサスペンド関数のコードによってのみ決定されます）。
+チャネル実装は、スレッドセーフなノンブロッキングサスペンド関数を提供するだけです。
 
-Writing scalable asynchronous applications is a discipline that one follows, making sure that ones code 
-never blocks, but suspends (using suspending functions), without actually blocking a thread.
-The Java concurrency primitives like 
-[`ReentrantLock`](https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/locks/ReentrantLock.html)
-are thread-blocking and they should not be used in a truly non-blocking code. To control access to shared
-resources one can define `Mutex` class that suspends an execution of coroutine instead of blocking it.
-The header of the corresponding class would like this:
-スケーラブルな非同期アプリケーションを書くことは、スレッドが実際にブロックされることなく、コードがブロックされずに中断される（中断機能を使用して）ことを確実にする規律です。Java並行処理のプリミティブ ReentrantLock はスレッドブロッキングであり、真に非ブロッキングコードでは使用しないでください。共有リソースへのアクセスを制御Mutexするために、コルーチンをブロックする代わりに、コルーチンの実行を中断するクラスを定義することができます。対応するクラスのヘッダは次のようになります：
+### ミューテックス
+
+スケーラブルな非同期アプリケーションを書くことは、実際にスレッドがブロックされることなく、コードがブロックされずに中断される（中断機能を使用して）ことを確実にする規律です。
+[`ReentrantLock`](https://docs.oracle.com/javase/jp/8/docs/api/java/util/concurrent/locks/ReentrantLock.html)のようなJava並行処理プリミティブはスレッドブロッキングであり、本当に非ブロッキングコードで使用すべきではありません。
+共有リソースへのアクセスを制御するために、コルーチンをブロックするのではなく実行を中断する `Mutex`クラスを定義することができます。
+対応するクラスのヘッダは次のようになります：
 
 ```kotlin
 class Mutex {
@@ -1180,17 +1058,10 @@ class Mutex {
 }
 ```
 
-> You can get full implementation [here](examples/mutex/mutex.kt).
-  The actual implementation in [kotlinx.coroutines](https://github.com/kotlin/kotlinx.coroutines) 
-  has a few additional functions.
-ここで完全に実装することができます。で実際の実装kotlinx.coroutinesは 、いくつかの追加機能を備えています。
+> [ここ](examples/mutex/mutex.kt)で完全な実装を得ることができます。
+[kotlinx.coroutines](https://github.com/kotlin/kotlinx.coroutines)の実際の実装には、いくつかの追加機能があります。
 
-Using this implementation of non-blocking mutex
-[the 9th concurrency example of a tour of Go](https://tour.golang.org/concurrency/9)
-can be translated into Kotlin using Kotlin's
-[`try-finally`](https://kotlinlang.org/docs/reference/exceptions.html)
-that serves the same purpose as Go's `defer`:
-この非ブロッキングミューテックス の実装を使用すると、Goのツアーの9番目の並行処理の例は、try-finally Goのものと同じ目的を果たす Kotlinのものを使用してKotlinに翻訳でき deferます。
+この非ブロッキングミューテックスの実装を使用すると、[Goのツアーの9番目の並行処理の例](https://tour.golang.org/concurrency/9)は、Goの `defer` と同じ目的を果たすKotlinの [`try-finally`](http://dogwood008.github.io/kotlin-web-site-ja/docs/reference/exceptions.html) を使ってKotlinに変換できます。
 
 ```kotlin
 class SafeCounter {
@@ -1211,8 +1082,7 @@ class SafeCounter {
 }
 ```
 
-> You can checkout working code [here](examples/channel/channel-example-9.kt)
-ここで作業コードをチェックアウトすることができます
+> [ここ](examples/channel/channel-example-9.kt)で動作するコードをチェックアウトすることができます
 
 ## Advanced topics
 
