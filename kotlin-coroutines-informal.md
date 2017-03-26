@@ -973,14 +973,6 @@ fun main(args: Array<String>) = mainBlocking {
 チャネルのバッファーサイズは自由にいじることができます。
 簡単にするため、バッファーされていないチャネルは概念的に前に説明した[非同期シーケンス](#非同期シーケンス)と類似しているため、この例ではバッファされたチャネルのみが実装されています（最小バッファサイズ1）。
 
-Go-style `select` control block that suspends until one of the actions becomes available on 
-one of the channels can be implemented as a Kotlin DSL, so that 
-[the 5th concurrency example of a tour of Go](https://tour.golang.org/concurrency/5)  would look 
-like this in Kotlin:
-selectアクションの1つがチャネルの1つで利用可能になるまで保留するGoスタイルの制御ブロックは、Kotlin DSLとして実装することができます。その ため、Goのツアーの5番目の並行処理の例は、 Kotlinでは次のようになります。
-
-Go-style `select` control block that suspends until one of the actions becomes available on one of the channels can be implemented as a Kotlin DSL, so that the 5th concurrency example of a tour of Go would look like this in Kotlin:
-
 アクションの1つがチャンネルの1つで利用可能になるまで停止するGoスタイルの `select` 制御ブロックは、Kotlin DSLとして実装することができ、[Goのツアーの5番目の並行処理の例](https://tour.golang.org/concurrency/5)は、Kotlinでは次のようになります。
  
 ```kotlin
