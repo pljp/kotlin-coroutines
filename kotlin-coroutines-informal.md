@@ -913,7 +913,7 @@ for (value in seq) { //プロデューサーを待っている間に中断
 
 > [ここ](examples/suspendingSequence/suspendingSequence-example.kt)で、実行を説明するログ出力を伴う実際の例を見つけることができます。
 
-### Channels
+### チャネル
 
 Goスタイルのタイプセーフなチャンネルは、Kotlinでライブラリとして実装できます。サスペンド関数 `send` として送信チャネルのインタフェースを定義することができます。
 
