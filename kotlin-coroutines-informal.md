@@ -1076,25 +1076,18 @@ class SafeCounter {
 
 > [ここ](examples/channel/channel-example-9.kt)で動作するコードをチェックアウトすることができます
 
-## Advanced topics
+## 詳細トピック
 
-This section covers some advanced topics dealing with resource management, concurrency, 
-and programming style.
 このセクションでは、リソース管理、同時実行性、およびプログラミングスタイルに関するいくつかの高度なトピックについて説明します。
 
-### Resource management and GC
+### リソース管理とGC
 
-Coroutines don't use any off-heap storage and do not consume any native resources by themselves, unless the code
-that is running inside a coroutine does open a file or some other resource. While files opened in a coroutine must
-be closed somehow, the coroutine itself does not need to be closed. When coroutine is suspended its whole state is 
-available by the reference to its continuation. If you lose the reference to suspended coroutine's continuation,
-then it will be ultimately collected by garbage collector.
-Coroutineは、オフヒープストレージを使用せず、コルーチン内で実行されているコードがファイルやその他のリソースを開かない限り、それ自身ではネイティブリソースを消費しません。コルーチン内で開かれたファイルは何とか閉じなければなりませんが、コルーチン自体を閉じる必要はありません。コルーチンが中断されている場合、コルーチン全体の状態はその続行を参照することで利用可能です。中断されたコルーチンの継続に関する参照を失った場合、最終的にはガベージコレクタによって収集されます。
+コルーチンは、オフヒープストレージを使用せず、コルーチン内で実行されているコードがファイルやその他のリソースを開かない限り、それ自身ではネイティブリソースを消費しません。
+コルーチン内で開かれたファイルは何とか閉じなければなりませんが、コルーチン自体を閉じる必要はありません。
+コルーチンが中断されている場合、コルーチン全体の状態はその継続を参照することで利用可能です。
+中断されたコルーチンの継続への参照を失った場合、最終的にはガベージコレクターによって収集されます。
 
-Coroutines that open some closeable resources deserve a special attention. Consider the following coroutine
-that uses the `buildSequence{}` builder from [restricted suspension](#restricted-suspension) section to produce
-a sequence of lines from a file:
-閉鎖可能なリソースを開くコルーチンは、特別な注意が必要です。制限付きサスペンド・セクションからbuildSequence{}ビルダーを使用して、ファイルから一連の行を生成する次のコルーチンを考えてみましょう。
+クローザブルリソースを開くコルーチンは特別な注意が必要です。[制限付きサスペンド](#制限付きサスペンド)セクションの `buildSequence{}` ビルダーを使用してファイルから行のシーケンスを生成する、次のコルーチンを考えてみましょう。
 
 ```kotlin
 fun sequenceOfLines(fileName: String) = buildSequence<String> {
@@ -1106,21 +1099,16 @@ fun sequenceOfLines(fileName: String) = buildSequence<String> {
 }
 ```
 
-This function returns a `Sequence<String>` and you can use this function to print all lines from a file 
-in a natural way:
-この関数はa Sequence<String>を返し、この関数を使って自然な方法でファイルからすべての行を出力することができます：
+この関数は `Sequence<String>` を返し、この関数を使って自然な方法でファイルからすべての行を出力することができます。
  
 ```kotlin
 sequenceOfLines("examples/sequence/sequenceOfLines.kt")
     .forEach(::println)
 ```
 
-> You can get full code [here](examples/sequence/sequenceOfLines.kt)
-ここで完全なコードを取得できます
+> [ここ](examples/sequence/sequenceOfLines.kt)で完全なコードを入手できます
 
-It works as expected as long as you iterate the sequence returned by the `sequenceOfLines` function
-completely. However, if you print just a few first lines from this file like here:
-sequenceOfLines関数が返すシーケンスを完全に反復する限り、期待どおりに動作します。しかし、ここのようにこのファイルから最初の行を数行だけ印刷すると、
+`sequenceOfLines` 関数が返すシーケンスを最後まで反復する限り、期待どおりに動作します。しかし、このようにこのファイルから最初の行を数行だけ印刷すると、
 
 ```kotlin
 sequenceOfLines("examples/sequence/sequenceOfLines.kt")
@@ -1128,138 +1116,79 @@ sequenceOfLines("examples/sequence/sequenceOfLines.kt")
         .forEach(::println)
 ```
 
-then the coroutine resumes a few times to yield the first three lines and becomes _abandoned_.
-It is Ok for the coroutine itself to be abandoned but not for the open file. The 
-[`use` function](https://kotlinlang.org/api/latest/jvm/stdlib/kotlin.io/use.html) 
-will not have a chance to finish its execution and close the file. The file will be left open
-until collected by GC, because Java files have a `finalizer` that closes the file. It is 
-not a big problem for a small slide-ware or a short-running utility, but it may be a disaster for
-a large backend system with multi-gigabyte heap, that can run out of open file handles 
-faster than it runs out of memory to trigger GC.
-コルーチンは数回再開して最初の3行を生成し、放棄されます。コルーチン自体が放棄されていても、開いているファイルには残っていないのはOKです。この use関数 は、実行を終了してファイルを閉じる機会はありません。Javaファイルにはfinalizerファイルを閉じるため、GCによって収集されるまでファイルは開いたままになります。小さなスライドウェアや短時間実行のユーティリティでは大きな問題ではありませんが、マルチギガバイトのヒープを持つ大規模なバックエンドシステムでは、開いているファイルハンドルが使い果たされたときよりも速く実行される可能性がありますGCをトリガするメモリ。
+コルーチンは数回再開して最初の3行を生成し、_放棄_されます。コルーチン自体は放棄されてもOKですが、開かれたファイルはそうではありません。この [`use`](https://kotlinlang.org/api/latest/jvm/stdlib/kotlin.io/use.html) 関数は、実行を終了してファイルを閉じる機会はありません。Javaのファイルは `finalizer` でファイルを閉じるため、GCによって収集されるまでファイルは開いたままになります。小さなスライドウェアや短時間実行されるユーティリティでは大きな問題ではありませんが、数ギガバイトのヒープを持つ大規模なバックエンドシステムでは、メモリを使い切ってGCを起動するよりも速く、開いているファイルハンドルが使い果たされる可能性があります。
 
-This is a similar gotcha to Java's 
-[`Files.lines`](https://docs.oracle.com/javase/8/docs/api/java/nio/file/Files.html#lines-java.nio.file.Path-)
-method that produces a lazy stream of lines. It returns a closeable Java stream, but most stream operations do not
-automatically invoke the corresponding 
-`Stream.close` method and it is up to the user to remember about the need to close the corresponding stream. 
-One can define closeable sequence generators 
-in Kotlin, but they will suffer from a similar problem that no automatic mechanism in the language can
-ensure that they are closed after use. It is explicitly out of the scope of Kotlin coroutines
-to introduce a language mechanism for an automated resource management.
-これは、JavaのFiles.lines メソッドに似 た問題であり、遅延のあるストリームを生成します。クローズ可能なJavaストリームを返しますが、ほとんどのストリーム操作では対応するStream.closeメソッドが自動的に起動されるわけではなく 、対応するストリームを閉じる必要性について覚えておく必要があります。Kotlinではクローズ可能なシーケンスジェネレータを定義できますが、言語上の自動メカニズムが使用後に閉じられることを保証できない同様の問題が発生します。自動化されたリソース管理のための言語メカニズムを導入することは、明示的にKotlinコルーチンの範囲外です。
+これは、Javaの [`Files.lines`](https://docs.oracle.com/javase/jp/8/docs/api/java/nio/file/Files.html#lines-java.nio.file.Path-)メソッドと同様のやり方で、遅延した行を生成します。
+クローザブルJavaストリームを返しますが、ほとんどのストリーム操作では対応する `Stream.close` メソッドが自動的に呼び出されるわけではなく、対応するストリームを閉じなければならないことを覚えておく必要があります。
+Kotlinではクローザブルシーケンスジェネレータを定義できますが、言語上の自動メカニズムでは使用後に閉じられることを保証できない同様の問題に悩まされます。
+自動化されたリソース管理のための言語メカニズムを導入することは、明示的にKotlinコルーチンの範囲外です。
 
-However, usually this problem does not affect asynchronous use-cases of coroutines. An asynchronous coroutine 
-is never abandoned, but ultimately runs until its completion, so if the code inside a coroutine properly closes
-its resources, then they will be ultimately closed.
-しかし、通常、この問題はコルーチンの非同期ユースケースには影響しません。非同期コルーチンは放棄されることはありませんが、最終的に完了するまで実行されるため、コルーチン内のコードが適切にリソースを閉じると、最終的にクローズされます。
+しかし、通常この問題はコルーチンの非同期ユースケースには影響しません。非同期コルーチンは放棄されることはなく最終的に完了するまで実行されるため、コルーチン内のコードが適切にリソースを閉じると最終的にクローズされます。
 
-### Concurrency and threads
+### 並行処理とスレッド
 
-Each individual coroutine, just like a thread, is executed sequentially. It means that the following kind 
-of code is perfectly safe inside a coroutine:
-個々のコルーチンは、スレッドと同様に、順次実行されます。これは、次のような種類のコードがコルーチン内で完全に安全であることを意味します。
+個々のコルーチンはスレッドと同様に順次実行されます。これは、次のような種類のコードがコルーチン内で完全に安全であることを意味します。
 
 ```kotlin
-launch(CommonPool) { // starts a coroutine // コルーチンを開始
+launch(CommonPool) { // コルーチンを開始
     val m = mutableMapOf<String, String>()
-    val v1 = someAsyncTask1().await() // suspends on await // awaitで中断
-    m["k1"] = v1 // modify map when resumed // 再開したらマップを変更
-    val v2 = someAsyncTask2().await() // suspends on await
-    m["k2"] = v2 // modify map when resumed // 再開したらマップを変更
+    val v1 = someAsyncTask1().await() // awaitで中断
+    m["k1"] = v1 // 再開したらマップを変更
+    val v2 = someAsyncTask2().await() // awaitで中断
+    m["k2"] = v2 // 再開したらマップを変更
 }
 ```
 
-You can use all the regular single-threaded mutable structures inside the scope of a particular coroutine.
-However, sharing mutable state _between_ coroutines is potentially dangerous. If you use a coroutine builder
-that install a dispatcher to resume all coroutines JS-style in the single event-dispatch thread, 
-like the `Swing` interceptor shown in [continuation interceptor](#continuation-interceptor) section,
-then you can safely work with all shared
-objects that are generally modified from this event-dispatch thread. 
-However, if you work in multi-threaded environment or otherwise share mutable state between
-coroutines running in different threads, then you have to use thread-safe (concurrent) data structures. 
-特定のコルーチンのスコープ内で、すべての通常のシングルスレッドの可変構造を使用できます。しかし、コルーチン間で変更可能な状態を共有することは潜在的に危険です。あなたのような、単一のイベントディスパッチスレッドですべてのコルーチンのJS-スタイルを再開するためにディスパッチャをインストールコルーチンビルダーを使用する場合Swingに示される迎撃継続インターセプタセクションを、あなたが安全に、一般的に、このイベントから変更されたすべての共有オブジェクトを操作することができます - ディスパッチスレッド。ただし、マルチスレッド環境で作業している場合や、別のスレッドで実行されているコルーチン間で可変状態を共有している場合は、スレッドセーフ（並行）データ構造を使用する必要があります。
+特定のコルーチンのスコープ内で、すべての通常のシングルスレッドのミュータブル構造を使用できます。
+しかし、コルーチン_間_でミュータブルな状態を共有することは潜在的に危険です。 
+ディスパッチャをインストールするコルーチン・ビルダーを使用して、[継続インターセプター](#継続インターセプター)セクションで示される `Swing` インターセプターのように単一のイベントディスパッチスレッドですべてのJSスタイルのコルーチンを再開すると、このイベントディスパッチスレッドから一般に変更されたすべての共有オブジェクトで安全に作業できます 
+ただし、マルチスレッド環境で作業している場合や、別のスレッドで実行されているコルーチン間でミュータブルな状態を共有している場合は、スレッドセーフ（並行）データ構造を使用する必要があります。
 
-Coroutines are like threads, albeit they are more lightweight. You can have millions of coroutines running on 
-just a few threads. The running coroutine is always executed in some thread. However, a _suspended_ coroutine
-does not consume a thread and it is not bound to a thread in any way. The suspending function that resumes this
-coroutine decides which thread the coroutine is resumed on by invoking `Continuation.resume` on this thread 
-and coroutine's interceptor can override this decision and dispatch the coroutine's execution onto a different thread.
-コルーチンはもっと軽量ですがスレッドのようなものです。ほんの数個のスレッドで数百万のコルーチンを動かすことができます。実行中のコルーチンは、常にあるスレッドで実行されます。しかし、サスペンドされているコルーチンはスレッドを消費せず、スレッドにバインドされません。このコルーチンを再開する一時停止機能Continuation.resumeは、このスレッドを呼び出してコルーチンが再開されたスレッドを決定し、コルーチンのインターセプタはこの決定をオーバーライドしてコルーチンの実行を別のスレッドにディスパッチできます。
+コルーチンはもっと軽量ですがスレッドのようなものです。ほんの数個のスレッドで数百万のコルーチンを動かすことができます。実行中のコルーチンは、常に何らかのスレッドで実行されます。しかし、_中断_されているコルーチンはスレッドを消費せず、スレッドにバインドされません。
+このコルーチンを再開するサスペンド関数は、このスレッドで `Continuation.resume` を呼び出してコルーチンが再開されるスレッドを決定し、コルーチンのインターセプターはこの決定をオーバーライドしてコルーチンの実行を別のスレッドにディスパッチできます。
 
-## Asynchronous programming styles
-
-There are different styles of asynchronous programming.
- 
-Callbacks were discussed in [asynchronous computations](#asynchronous-computations) section and are generally
-the least convenient style that coroutines are designed to replace. Any callback-style API can be
-wrapped into the corresponding suspending function as shown [here](#wrapping-callbacks). 
-
-Let us recap. For example, assume that you start with a hypothetical _blocking_ `sendEmail` function 
-with the following signature:
+## 非同期プログラミングスタイル
 
 さまざまなスタイルの非同期プログラミングがあります。
 
-コールバックは非同期計算セクションで議論され、一般に、コルーチンが置き換えるように設計されている最も簡単なスタイルです。コールバックスタイルのAPIは、ここに示すように、対応する一時停止関数にラップすることができます。
+コールバックは[非同期計算](#非同期計算)セクションで議論され、一般に、コルーチンが置き換えるように設計されている最も簡単なスタイルです。コールバックスタイルのAPIは、[ここ](#コールバックのラッピング)に示すように、対応するサスペンド関数にラップすることができます。
 
-私たちを要約しましょう。たとえば、次のシグネチャで仮想的なブロッキング sendEmail関数を使い始めるとします。
+要約しましょう。たとえば、次のシグネチャで仮想的なブロッキング `sendEmail` 関数を使い始めるとします。
 
 ```kotlin
 fun sendEmail(emailArgs: EmailArgs): EmailResult
 ```
 
-It blocks execution thread for potentially long time while it operates.
+これは動作中に実行スレッドを潜在的に長時間ブロックします。
 
-To make it non-blocking you can use, for example, error-first 
-[node.js callback convention](https://www.tutorialspoint.com/nodejs/nodejs_callbacks_concept.htm)
-to represent its non-blocking version in callback-style with the following signature:
-
-動作中に実行スレッドを潜在的に長時間ブロックします。
-
-非ブロッキングにするには、たとえば、エラーファーストの node.jsコールバック規約 を使用して、非ブロッキングバージョンをコールバックスタイルで次のシグネチャで表すことができます。
+非ブロッキングにするには、たとえば、エラーファーストの [node.jsコールバック規約](https://www.tutorialspoint.com/nodejs/nodejs_callbacks_concept.htm)を使用して、非ブロッキングバージョンをコールバックスタイルで次のシグネチャで表すことができます。
 
 ```kotlin
 fun sendEmail(emailArgs: EmailArgs, callback: (Throwable?, EmailResult?) -> Unit)
 ```
 
-However, coroutines enable other styles of asynchronous non-blocking programming. One of them
-is async/await style that is built into many popular languages.
-In Kotlin this style can be replicated by introducing `future{}` and `.await()` library functions
-that were shown as a part of [futures](#futures) use-case section.
- 
-This style is signified by the convention to return some kind of future object from the function instead 
-of taking a callback as a parameter. In this async-style the signature of `sendEmail` is going to look like this:
+しかし、コルーチンは、他のスタイルの非同期ノンブロッキングプログラミングを可能にします。それらの1つは、多くの一般的な言語に組み込まれているasync/awaitスタイルです。
+Kotlinでは、[Futures](#futures)のユースケースセクションの一部として示された `future{}` と `.await()` ライブラリ関数を導入することによって、このスタイルを再現することができます。
 
-しかし、コルーチンは、他のスタイルの非同期ノンブロッキングプログラミングを可能にします。それらの1つは、多くの一般的な言語に組み込まれているasync / awaitスタイルです。Kotlinではこのスタイルは、導入して複製することができるfuture{}と.await()の一部として示された機能ライブラリ先物ユースケースセクションを。
-
-このスタイルは、コールバックをパラメータとして使用するのではなく、関数から何らかの将来のオブジェクトを返すように条約によって示されています。この非同期スタイルでは、署名は次のsendEmailようになります。
+このスタイルは、コールバックをパラメータとして使用するのではなく、関数から何らかのフューチャーオブジェクトを返すように慣習によって示されています。この非同期スタイルでは、`sendEmail` のシグネチャは次のようになります。
 
 ```kotlin
 fun sendEmailAsync(emailArgs: EmailArgs): Future<EmailResult>
 ```
 
-As a matter of style, it is a good practice to add `Async` suffix to such method names, because their 
-parameters are no different from a blocking version and it is quite easy to make a mistake of forgetting about
-asynchronous nature of their operation. The function `sendEmailAsync` starts a _concurrent_ asynchronous operation 
-and potentially brings with it all the pitfalls of concurrency. However, languages that promote this style of 
-programming also typically have some kind of `await` primitive to bring the execution back into the sequence as needed. 
+スタイルの問題として、それらのパラメータがブロッキング版と変わらず、操作の非同期性を忘れて間違いやすいので、このようなメソッド名に `Async` サフィックスを追加することは良い習慣です。
+関数 `sendEmailAsync` は、_並行_非同期操作を開始し、潜在的に並行処理の落とし穴をもたらします。
+しかし、このスタイルのプログラミングを促進する言語は、通常、必要に応じて実行をシーケンスに戻すために、ある種の `await` プリミティブを持っています。
 
-Kotlin's _native_ programming style is based on suspending functions. In this style, the signature of 
-`sendEmail` looks naturally, without any mangling to its parameters or return type but with an additional
-`suspend` modifier:
-
-スタイルの問題として、Asyncそのメソッド名には接尾辞を追加することをお勧めします。それらのパラメータはブロッキング版と変わらず、操作の非同期性を忘れることは間違いありません。この関数sendEmailAsyncは並行非同期操作を開始し、潜在的に並行処理の落とし穴をもたらします。しかし、このプログラミングスタイルを促進するawait言語には、通常、実行を必要に応じてシーケンスに戻すためのプリミティブがあります。
-
-Kotlinのネイティブプログラミングスタイルは、機能を一時停止することに基づいています。このスタイルでは、 sendEmailそのパラメータや戻り値の型に変更を加えることなく、suspend修飾子を追加して、自然に署名が生成され ます。
+Kotlinの_ネイティブ_プログラミングスタイルは、サスペンド関数に基づいています。
+このスタイルでは、`sendEmail` のシグネチャは自然に見えます。パラメータや戻り値の型に変更はありませんが、追加の `suspend` 修飾子が付いています。
 
 ```kotlin
 suspend fun sendEmail(emailArgs: EmailArgs): EmailResult
 ```
 
-The async and suspending styles can be easily converted into one another using the primitives that we've 
-already seen. For example, `sendEmailAsync` can be implemented via suspending `sendEmail` using
-[`future` coroutine builder](#building-futures):
-非同期スタイルと中断スタイルは、既に見たプリミティブを使用して簡単に相互に変換できます。たとえば、コルーチンビルダーを使用して 中断sendEmailAsyncすることで実装できます。sendEmailfuture
+非同期スタイルとサスペンドスタイルは、既に見たプリミティブを使用して簡単に相互に変換できます。
+例えば、`sendEmailAsync` は `sendEmail` を [`future` コルーチンビルダー](#futureの作成)を使って中断することで実装できます。
 
 ```kotlin
 fun sendEmailAsync(emailArgs: EmailArgs): Future<EmailResult> = future {
@@ -1267,79 +1196,51 @@ fun sendEmailAsync(emailArgs: EmailArgs): Future<EmailResult> = future {
 }
 ```
 
-while suspending function `sendEmail` can be implemented via `sendEmailAsync` using
-[`.await()` suspending function](#suspending-functions)
-サスペンド機能sendEmailをsendEmailAsync使用してサスペンド機能を 実装することもでき.await()ます
+サスペンド関数 `sendEmail` は [`.await()` サスペンド関数](#サスペンド関数)を使って `sendEmailAsync` によって実装することができます。
 
 ```kotlin
 suspend fun sendEmail(emailArgs: EmailArgs): EmailResult = 
     sendEmailAsync(emailArgs).await()
 ```
 
-So, in some sense, these two styles are equivalent and are both definitely superior to callback style in their
-convenience. However, let us look deeper at a difference between `sendEmailAsync` and suspending `sendEmail`.
+したがって、ある意味では、これらの2つのスタイルは同等であり、どちらも利便性においてコールバックスタイルよりも優れています。
+`sendEmailAsync` と サスペンド `sendEmail` の違いをもっと深く見てみましょう。
 
-Let us compare how they **compose** first. Suspending functions can be composed just like normal functions:
-
-したがって、ある意味では、これらの2つのスタイルは同等であり、どちらも便利なコールバックスタイルより優れています。しかし、私たちはとの間の差でより深く見てみましょうsendEmailAsyncと懸濁sendEmail。
-
-最初にどのように構成するかを比較してみましょう。一時停止機能は、通常の機能と同様に構成することができます。
+最初にどのように**構成**するかを比較してみましょう。サスペンド関数は、通常の関数と同様に構成することができます。
 
 ```kotlin
 suspend fun largerBusinessProcess() {
-    // a lot of code here, then somewhere inside //ここにたくさんのコードがあります。
+    // ここにたくさんのコードがある
     sendEmail(emailArgs)
-    // something else goes on after that //その後に何かが続く 
+    // その後に何かが続く
 }
 ```
 
-The corresponding async-style functions compose in this way:
 対応する非同期スタイルの関数は次のように構成されます。
 
 ```kotlin
 fun largerBusinessProcessAsync() = future {
-   // a lot of code here, then somewhere inside
+   // ここにたくさんのコードがある
    sendEmailAsync(emailArgs).await()
-   // something else goes on after that //その後に何かが続く 
+   // その後に何かが続く 
 }
 ```
 
-Observe, that async-style function composition is more verbose and _error prone_. 
-If you omit `.await()` invocation in async-style
-example,  the code still compiles and works, but it now does email sending process 
-asynchronously or even _concurrently_ with the rest of a larger business process, 
-thus potentially modifying some shared state and introducing some very hard to reproduce errors.
-On the contrary, suspending functions are _sequential by default_.
-With suspending functions, whenever you need any concurrency, you explicitly express it in the source code with 
-some kind of `future{}` or a similar coroutine builder invocation.
+非同期スタイル関数の構成はより冗長で_エラーが発生しやすい_ことに注意してください。
+非同期スタイルの例で `.await（）`呼び出しを省略すると、コードはコンパイルされて動作しますが、電子メールはプロセスを非同期的に、または大規模なビジネスプロセスの他の部分と_並行して_送信します。潜在的に共有状態を変更し、非常に再現が難しいエラーを取り込みます。
+逆に、サスペンド関数は_デフォルトでは順次実行されます_。
+サスペンド関数では、並行性が必要なときはいつでも、ある種の `future{}` や同様のコルーチンビルダー呼び出しをソースコードに明示します。
 
-Compare how these styles **scale** for a big project using many libraries. Suspending functions are
-a light-weight language concept in Kotlin. All suspending functions are fully usable in any unrestricted Kotlin coroutine.
-Async-style functions are framework-dependent. Every promises/futures framework must define its own `async`-like 
-function that returns its own kind of promise/future class and its own `await`-like function, too.
+多くのライブラリを使用する大きなプロジェクトで、これらのスタイルの**スケール**をどのように比較するか。サスペンド関数は、Kotlinの軽量言語の概念です。すべてのサスペンド機能は、無制限のKotlinコルーチンで完全に使用できます。非同期スタイルの関数はフレームワークに依存します。
+すべてのプロミス/フューチャーのフレームワークは、独自のプロミス/フューチャークラスを返す `async` のような関数や `await` のような関数も定義しなければなりません。
 
-Compare their **performance**. Suspending functions provide minimal overhead per invocation. 
-You can checkout [implementation details](#implementation-details) section.
-Async-style functions need to keep quite heavy promise/future abstraction in addition to all of that suspending machinery. 
-Some future-like object instance must be always returned from async-style function invocation and it cannot be optimized away even 
-if the function is very short and simple. Async-style is not well-suited for very fine-grained decomposition.
+**パフォーマンス**を比較します。サスペンド関数は、呼び出しごとに最小限のオーバーヘッドを提供します。[実装の詳細](#実装の詳細)セクションでチェックアウトできます。
+非同期スタイルの関数は、そのすべての中断機構に加えて、かなり重いプロミス/フューチャーの抽象化を維持する必要があります。
+フューチャーのようなオブジェクトインスタンスは、非同期スタイルの関数呼び出しから常に返されなければならず、関数が非常に短く単純な場合でも最適化できません。
+非同期スタイルは非常に細かい分解には適していません。
 
-Compare their **interoperability** with JVM/JS code. Async-style functions are more interoperable with JVM/JS code that 
-uses a matching type of future-like abstraction. In Java or JS they are just functions that return a corresponding
-future-like object. Suspending functions look strange from any language that does not support 
-[continuation-passing-style](#continuation-passing-style) natively.
-However, you can see in the examples above how easy it is to convert any suspending function into an 
-async-style function for any given promise/future framework. So, you can write suspending function in Kotlin just once, 
-and then adapt it for interop with any style of promise/future with one line of code using an appropriate 
-`future{}` coroutine builder function.
-
-async-style関数の構成はより冗長でエラーが発生しやすいことに注意してください。.await()非同期スタイルの例で呼び出しを省略すると、コードはコンパイルされて動作しますが、電子メールはプロセスを非同期に、または大規模なビジネスプロセスの他の部分と同時に送信するため、共有状態を変更したり、エラー。逆に、一時停止機能はデフォルトでは順次実行されます。サスペンド機能では、並行処理が必要なときはいつでも、何らかのfuture{}コルーチン・ビルダー呼び出しを使ってソース・コードで明示的に表現します。
-
-多くのライブラリを使用する大きなプロジェクトで、これらのスタイルのスケールをどのように比較するか。一時停止機能は、Kotlinの軽量言語の概念です。すべてのサスペンド機能は、無制限のKotlinコルーチンで完全に使用できます。非同期スタイルの関数はフレームワークに依存します。あらゆる約束/先物の枠組みasyncは、それ自身の種類の約束/将来の階級とそれ自身のawaitような機能を返すそれ自体のような機能を定義しなければならない。
-
-パフォーマンスを比較する。サスペンド機能は、呼び出しごとに最小限のオーバーヘッドを提供します。あなたはチェックアウト実施の詳細セクションができます。非同期スタイルの関数は、その中断されているすべての機械に加えて、かなりの有望性/将来の抽象化を維持する必要があります。将来のようなオブジェクトインスタンスは、非同期スタイルの関数呼び出しから常に返されなければならず、関数が非常に短く単純な場合でも最適化できません。非同期スタイルは非常に細かい分解には適していません。
-
-JVM / JSコードとの相互運用性を比較する。非同期スタイルの関数は、将来のような抽象化のタイプを使用するJVM / JSコードとの相互運用性が向上します。JavaやJSでは、それは対応する将来のようなオブジェクトを返す関数に過ぎません。一時停止機能は、継続継承スタイルをネイティブにサポートしない言語からは変わってい ます。しかし、上の例では、任意の約束/将来のフレームワークに対して、サスペンド関数を非同期スタイルの関数に変換するのが簡単であることがわかります。したがって、Kotlinに一時停止機能を一度書くだけで、適切なfuture{}コルーチンビルダー機能を使用して、コードの1行で将来のあらゆるスタイルのinteropに適応させることができ ます。
+JVM/JSコードとの**相互運用性**を比較します。非同期スタイルの関数は、フューチャーのような抽象化のタイプを使用するJVM/JSコードとの相互運用性が向上します。JavaやJSでは、それは対応するフューチャーのようなオブジェクトを返す関数に過ぎません。サスペンド関数は、[継続渡しスタイル](#継続渡しスタイル)をネイティブにサポートしない言語からは奇妙に見えます。しかし、上の例では、任意のプロミス/フューチャーのフレームワークに対して、サスペンド関数を非同期スタイルの関数に変換するのが簡単であることがわかります。
+したがって、Kotlinでサスペンド関数を一度書くだけで、`future{}` コルーチンビルダー関数を使ってコード1行で任意のプロミス/フューチャースタイルと相互運用することができます。
 
 ## Implementation details
 
