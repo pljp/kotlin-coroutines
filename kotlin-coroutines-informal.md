@@ -53,8 +53,8 @@
   * [継続渡しスタイル](#継続渡しスタイル)
   * [状態マシン](#状態マシン)
   * [サスペンド関数のコンパイル](#サスペンド関数のコンパイル)
-  * [Coroutine intrinsics](#coroutine-intrinsics)
-* [改訂履歴](#revision-history)
+  * [コルーチンの基礎](#コルーチンの基礎)
+* [Revision history](#revision-history)
   * [Changes in revision 3.2](#changes-in-revision-32)
   * [Changes in revision 3.1](#changes-in-revision-31)
   * [Changes in revision 3](#changes-in-revision-3)
@@ -1242,104 +1242,64 @@ fun largerBusinessProcessAsync() = future {
 JVM/JSコードとの**相互運用性**を比較します。非同期スタイルの関数は、フューチャーのような抽象化のタイプを使用するJVM/JSコードとの相互運用性が向上します。JavaやJSでは、それは対応するフューチャーのようなオブジェクトを返す関数に過ぎません。サスペンド関数は、[継続渡しスタイル](#継続渡しスタイル)をネイティブにサポートしない言語からは奇妙に見えます。しかし、上の例では、任意のプロミス/フューチャーのフレームワークに対して、サスペンド関数を非同期スタイルの関数に変換するのが簡単であることがわかります。
 したがって、Kotlinでサスペンド関数を一度書くだけで、`future{}` コルーチンビルダー関数を使ってコード1行で任意のプロミス/フューチャースタイルと相互運用することができます。
 
-## Implementation details
+## 実装の詳細
 
-This section provides a glimpse into implementation details of coroutines. They are hidden
-behind the building blocks explained in [coroutines overview](#coroutines-overview) section and
-their internal classes and code generation strategies are subject to change at any time as
-long as they don't break contracts of public APIs and ABIs.
-このセクションでは、コルーチンの実装の詳細を垣間見ることができます。コルーチンの概要セクションで説明されているビルディングブロックの背後に隠されています。内部クラスやコード生成戦略は、公開APIやABIの契約を破らない限り、いつでも変更されることがあります。
+このセクションではコルーチンの実装の詳細を垣間見ることができます。これらは[コルーチンの概要](#コルーチンの概要)セクションで説明されているビルディングブロックの背後に隠されていて、内部クラスやコード生成戦略は公開APIやABIの契約を破らない限りいつでも変更されることがあります。
 
-### Continuation passing style
+### 継続渡しスタイル
 
-Suspending functions are implemented via Continuation-Passing-Style (CPS).
-Every suspending function and suspending lambda has an additional `Continuation` 
-parameter that is implicitly passed to it when it is invoked. Recall, that a declaration
-of [`await` suspending function](#suspending-functions) looks like this:
-サスペンド機能は、Continuation-Passing-Style（CPS）によって実装されます。すべての中断関数とラムダを中断するContinuation パラメータは、呼び出されるときに暗黙的に渡される追加パラメータを持ちます。await呼び出されると、関数の中断宣言は次のようになります。
+サスペンド関数は、継続渡しスタイル（CPS）によって実装されます。
+すべてのサスペンド関数とサスペンドラムダはそれが呼び出されたときに暗黙的に渡される追加の `Continuation` パラメータを持ちます。
+`await` サスペンド関数の宣言が次のようになっていることを思い出してください。
 
 ```kotlin
 suspend fun <T> CompletableFuture<T>.await(): T
 ```
 
-However, its actual _implementation_ has the following signature after _CPS transformation_:
-ただし、実際の実装では、CPS変換後に次のシグネチャがあります。
+ただし、実際の_実装_では_CPS変換_後に次のシグネチャがあります。
 
 ```kotlin
 fun <T> CompletableFuture<T>.await(continuation: Continuation<T>): Any?
 ```
 
-Its result type `T` has moved into a position of type argument in its additional continuation parameter.
-The implementation result type of `Any?` is designed to represent the action of the suspending function.
-When suspending function _suspends_ coroutine, it returns a special marker value of 
-`COROUTINE_SUSPENDED`. When a suspending function does not suspend coroutine but
-continues coroutine execution, it returns its result or throws an exception directly.
-This way, the `Any?` return type of the `await` implementation is actually a union of
-`COROUTINE_SUSPENDED` and `T` that cannot be expressed in Kotlin's type system.
+その結果の型 `T` は、追加の継続パラメータの型引数の位置に移動しました。実装結果の型 `Any?` は、サスペンド関数の動作を表すように設計されています。サスペンド関数がコルーチンを_中断_すると、特殊なマーカー値 `COROUTINE_SUSPENDED` が返されます。サスペンド関数がコルーチンを中断しないでコルーチンの実行を続けると、直接結果を返したり例外をスローしたりします。
+このように、`await` 実装の `Any?` リターンタイプは、実際にはKotlinの型システムでは表現できない` COROUTINE_SUSPENDED`と `T`の和集合です。
 
-The actual implementation of the suspending function is not allowed to invoke the continuation in its stack frame directly 
-because that may lead to stack overflow on long-running coroutines. The `suspendCoroutine` function in
-the standard library hides this complexity from an application developer by tracking invocations
-of continuations and ensures conformance to the actual implementation contract of 
-the suspending functions regardless of how and when the continuation is invoked.
+サスペンド関数の実際の実装では、スタックフレーム内の継続を直接呼び出すことはできません。これは、長期実行のコルーチンでスタックオーバーフローが発生する可能性があるためです。
+標準ライブラリの `suspendCoroutine` 関数は、継続の呼び出しを追跡することによってアプリケーション開発者からこの複雑さを隠し、継続が呼び出される方法と時間に関係なく、サスペンド関数の実際の実装規約に確実に適合します。
 
-その結果の型Tは、追加の継続パラメータで型引数の位置に移動しました。実装結果の型Any?は、中断機能の動作を表すように設計されています。サスペンド機能がコルーチンを中断すると、特殊マーカー値が返され COROUTINE_SUSPENDEDます。サスペンド機能がコルーチンを中断しないが、コルーチンの実行を続けると、その結果を返したり、例外を直接スローしたりします。このように、Any?の戻り値の型awaitの実装は、実際の労働組合である COROUTINE_SUSPENDEDとT、それはKotlinの型システムで表現することはできません。
+### 状態マシン
 
-一時停止関数の実際の実装では、スタックフレーム内の継続を直接呼び出すことはできません。これは、長期実行のコルーチンでスタックオーバーフローが発生する可能性があるためです。suspendCoroutine標準ライブラリの関数は、継続の呼び出しを追跡することによって、アプリケーション開発者からこの複雑さを隠し、関係なく、いつどのように継続が呼び出されるのサスペンド機能の実際の実装契約への適合性を保証します。
+コルーチンを効率的に実装すること、つまりできるだけクラスとオブジェクトを少なくすることが重要です。多くの言語が_状態マシン_としてそれらを実装し、Kotlinも同じことをしています。Kotlinの場合、このアプローチは、コンパイラが本体に任意の数の中断ポイントを持つ可能性のあるサスペンドラムダにつきクラスを1つだけ作成することになります。
 
-### State machines
-
-It is crucial to implement coroutines efficiently, i.e. create as few classes and objects as possible.
-Many languages implement them through _state machines_ and Kotlin does the same. In the case of Kotlin 
-this approach results in the compiler creating only one class per suspending lambda that may
-have an arbitrary number of suspension points in its body.   
- 
-Main idea: a suspending function is compiled to a state machine, where states correspond to suspension points. 
-Example: let's take a suspending block with two suspension points:
-
-コルーチンを効率的に実装すること、つまりできるだけクラスとオブジェクトを少なくすることが重要です。多くの言語がステートマシンを通じてそれらを実装し、Kotlinも同じことをしています。Kotlinの場合、このアプローチは、コンパイラが、体内に任意の数のサスペンドポイントを持つ可能性のあるラムダを一時停止するクラスを1つだけ作成することになります。
-
-主なアイデア：サスペンド機能は、サスペンドポイントに対応するステートマシンにコンパイルされます。例：2つのサスペンドポイントを持つサスペンドブロックを作成しましょう。
+主なアイデア。サスペンド関数は、状態が中断ポイントに対応する状態マシンにコンパイルされます。
+例：2つの中断ポイントを持つサスペンドブロックを作成しましょう。
  
 ```kotlin
 val a = a()
-val y = foo(a).await() // suspension point #1
+val y = foo(a).await() // 中断ポイント #1
 b()
-val z = bar(a, y).await() // suspension point #2
+val z = bar(a, y).await() // 中断ポイント #2
 c(z)
 ``` 
 
-There are three states for this block of code:
- 
- * initial (before any suspension point)
- * after the first suspension point
- * after the second suspension point
- 
-Every state is an entry point to one of the continuations of this block 
-(the initial continuation continues from the very first line). 
- 
-The code is compiled to an anonymous class that has a method implementing the state machine, 
-a field holding the current state of the state machine, and fields for local variables of 
-the coroutine that are shared between states (there may also be fields for the closure of 
-the coroutine, but in this case it is empty). Here's pseudo-Java code for the block above
-that uses continuation passing style for invocation of suspending functions `await`:
-
 このコードブロックには3つの状態があります。
 
-* イニシャル（サスペンドポイントの前）
-* 最初のサスペンド後
-* 第2の懸架点の後
+* 初期（中断ポイントの前）
+* 最初の中断後
+* 第2の中断ポイントの後
 
 すべての状態は、このブロックの継続の1つのエントリポイントです（最初の継続は最初の行から続きます）。
 
-このコードは、ステートマシンを実装するメソッド、ステートマシンの現在のステートを保持するフィールド、ステート間で共有されるコルーチンのローカル変数のフィールドを持つ匿名クラスにコンパイルされます（クロージャのフィールドこの場合コルーチンは空です）。一時停止関数の呼び出しのために継続継承スタイルを使用する、上記のブロックの擬似Javaコードはawait次のとおりです。
+このコードは、状態マシンを実装するメソッド、状態マシンの現在の状態を保持するフィールド、状態間で共有されるコルーチンのローカル変数のフィールドを持つ匿名クラスにコンパイルされます（コルーチンのクロージャのフィールドがあるかもしれませんが、この場合は空です）。
+サスペンド関数の呼び出しのために継続渡しスタイルを使用する、上記のブロックの擬似Javaコードはawait次のとおりです。
+サスペンド関数 `await` を呼び出すために継続渡しスタイルを使用する、上記のブロックの擬似Javaコードです：
   
 ``` java
 class <anonymous_for_state_machine> extends CoroutineImpl<...> implements Continuation<Object> {
-    // The current state of the state machine//ステートマシンの現在の状態
+    // 状態マシンの現在の状態
     int label = 0
     
-    // local variables of the coroutine
     //コルーチンのローカル変数
     A a = null
     Y y = null
@@ -1351,48 +1311,35 @@ class <anonymous_for_state_machine> extends CoroutineImpl<...> implements Contin
         else throw IllegalStateException()
         
       L0:
-        // data is expected to be `null` at this invocation
-        //この呼び出しでdataは`null`になると予想されます
+        //この呼び出しでdataは `null` になると予想される
         a = a()
         label = 1
-        data = foo(a).await(this) // 'this' is passed as a continuation 
-        if (data == COROUTINE_SUSPENDED) return // return if await had suspended execution
+        data = foo(a).await(this) // 'this' は継続として渡される
+        if (data == COROUTINE_SUSPENDED) return // awaitが実行を中断した場合はリターンする
       L1:
-        // external code has resumed this coroutine passing the result of .await() as data 
+        // 外部コードがawaitの結果をdataとして渡してコルーチンを再開した
         y = (Y) data
         b()
         label = 2
-        data = bar(a, y).await(this) // 'this' is passed as a continuation
-        if (data == COROUTINE_SUSPENDED) return // return if await had suspended execution
+        data = bar(a, y).await(this) // 'this' は継続として渡される
+        if (data == COROUTINE_SUSPENDED) return // awaitが実行を中断した場合はリターンする
       L2:
-        // external code has resumed this coroutine passing the result of .await() as data 
+        // 外部コードがawaitの結果をdataとして渡してコルーチンを再開した
         Z z = (Z) data
         c(z)
-        label = -1 // No more steps are allowed
+        label = -1 // これ以上のステップは許可されない
         return
     }          
 }    
 ```  
 
-Note that there is a `goto` operator and labels because the example depicts what happens in the 
-byte code, not in the source code.
+例にはソースコードではなくバイトコードで何が起こるのかが示されているので、 `goto` 演算子とラベルがあることに注意してください。
 
-Now, when the coroutine is started, we call its `resume()` — `label` is `0`, 
-and we jump to `L0`, then we do some work, set the `label` to the next state — `1`, call `.await()`
-and return if the execution of the coroutine was suspended. 
-When we want to continue the execution, we call `resume()` again, and now it proceeds right to 
-`L1`, does some work, sets the state to `2`, calls `.await()` and again returns in case of suspension.
-Next time it continues from `L3` setting the state to `-1` which means 
-"over, no more work to do". 
+コルーチンが起動したとき、`resume()`を呼び出します。`label` は `0` で、`L0` にジャンプしてからいくらかの作業をして、`label` を次の状態 `1` に設定します。`.await()` を呼び出し、コルーチンの実行が中断されたらリターンします。
+実行を続行したいときには `resume()` をもう一度呼び出すと今度は `L1` へと進み、いくらか作業をして状態を `2` に設定して `.await()` を呼び出し、中断の場合は再びリターンします。
+次回は `L3` から状態を `-1` に設定して続けます。これは「終わった、やるべきことはもうない」という意味です。
 
-A suspension point inside a loop generates only one state, 
-because loops also work through (conditional) `goto`:
-
-gotoこの例は、ソースコードではなくバイトコードで何が起こるかを示しているため、演算子とラベルがあることに注意してください。
-
-コルーチンが起動されると、私たちはresume()- labelと呼んで、0ジャンプしてL0、次に仕事labelをし、次の状態に設定し 、コルーチンの実行が中断された場合に1呼び出し.await()て返します。私たちは執行を続けたいときには、resume()もう一度電話をかけて、今すぐ右に進み L1、仕事をして、州を設定し2、電話をかけ.await()、中断した場合には再び戻ります。次回L3は、状態を設定することから、-1「終わったら、それ以上はやらない」という意味になります。
-
-ループ内のサスペンドポイントは1つの状態のみを生成します。これはループも機能します（条件付き）goto。
+ループ内のサスペンドポイントは1つの状態しか生成しません。これはループも（条件付き）`goto` によって動作するからです。
  
 ```kotlin
 var x = 0
@@ -1401,14 +1348,14 @@ while (x < 10) {
 }
 ```
 
-is generated as
+は、以下のように生成されます
 
 ``` java
 class <anonymous_for_state_machine> extends CoroutineImpl<...> implements Continuation<Object> {
-    // The current state of the state machine//ステートマシンの現在の状態
+    // 状態マシンの現在の状態
     int label = 0
     
-    // local variables of the coroutine//コルーチンのローカル変数
+    // コルーチンのローカル変数
     int x
     
     void resume(Object data) {
@@ -1421,104 +1368,65 @@ class <anonymous_for_state_machine> extends CoroutineImpl<...> implements Contin
       LOOP:
         if (x > 10) goto END
         label = 1
-        data = nextNumber().await(this) // 'this' is passed as a continuation // 'this'は継続として渡された
-        if (data == COROUTINE_SUSPENDED) return // return if await had suspended execution//待つ場合に返す実行中断していた
+        data = nextNumber().await(this) // 'this' は継続として渡される
+        if (data == COROUTINE_SUSPENDED) return // awaitが実行を中断した場合はリターンする
       L1:
-        // external code has resumed this coroutine passing the result of .await() as data 
-        //外部コードをデータとして）.await（の結果を渡し、このコルーチンを再開しました 
+        // 外部コードがawaitの結果をdataとして渡してコルーチンを再開した
         x += ((Integer) data).intValue()
         label = -1
         goto LOOP
       END:
-        label = -1 // No more steps are allowed //これ以上のステップは許されません
+        label = -1 // これ以上のステップは許可されない
         return 
     }          
 }    
 ```  
 
-### Compiling suspending functions
+### サスペンド関数のコンパイル
 
-The compiled code for suspending function depends on how and when it invokes other suspending functions.
-In the simplest case, a suspending function invokes other suspending functions only at _tail positions_ 
-making _tail calls_ to them. This is a typical case for suspending functions that implement low-level synchronization 
-primitives or wrap callbacks, as shown in [suspending functions](#suspending-functions) and
-[wrapping callbacks](#wrapping-callbacks) sections. These functions invoke some other suspending function
-like `suspendCoroutine` at tail position. They are compiled just like regular non-suspending functions, with 
-the only exception that the implicit continuation parameter they've got from [CPS transformation](#continuation-passing-style)
-is passed to the next suspending function in tail call.
+サスペンド関数のコンパイルされたコードは、他のサスペンド関数をいつどのように呼び出すかによって異なります。
+最も単純なケースでは、サスペンド関数は、他のサスペンド関数を_末尾の位置_でのみ呼び出すため、_末尾の呼び出し_が行われます。
+[サスペンド関数](#サスペンド関数)や[コールバックのラッピング](#コールバックのラッピング)のセクションで示すように、低レベルの同期プリミティブやコールバックのラップを実装するサスペンド関数の典型的なケースです。
+これらの関数は、末尾で `suspendCoroutine` のような他のサスペンド関数を呼び出します。
+これらは、通常の非サスペンド関数と同様にコンパイルされますが、唯一の例外は[CPS変換](#継続渡しスタイル)から得た暗黙の継続パラメーターが末尾呼び出しの次のサスペンド関数に渡されることです。
 
-> Note: in the current implementation `Unit`-returning function must include an explicit `return` statement 
-with the invocation of the other suspending function in order for it to be recognized as a tail call.
+> 注：現行の実装では、`Unit` を返す関数は、他のサスペンド関数の呼び出しがテールコールとして認識されるように、明示的な `return` ステートメントを含める必要があります。
 
-In a case when suspending invocations appear in non-tail positions, the compiler creates a 
-[state machine](#state-machines) for the corresponding suspending function. An instance of the state machine
-object in created when suspending function is invoked and is discarded when it completes.
+サスペンド呼び出しが末尾以外に現れる場合、コンパイラは対応するサスペンド関数用の[状態マシン](#状態マシン)を作成します。
+サスペンド関数が呼び出されたときに作成され、完了すると破棄される状態マシンオブジェクトのインスタンスです。
 
-> Note: in the future versions this compilation strategy may be optimized to create an instance of a state machine 
-only at first suspension point.
+> 注：将来のバージョンでは、このコンパイル戦略を最初の中断ポイントでのみステートマシンのインスタンスを作成ように最適化します。
 
-This state machine object, in turn, serves as the _completion continuation_ for the invocation of other
-suspending functions in non-tail positions. This state machine object instance is updated and reused when 
-the function makes multiple invocations to other suspending functions. 
-Compare this to other [asynchronous programming styles](#asynchronous-programming-styles),
-where each subsequent step of asynchronous processing is typically implemented with a separate, freshly allocated,
-closure object.
-
-関数を一時停止するためにコンパイルされたコードは、他の一時停止関数をいつどのように呼び出すかによって異なります。最も単純なケースでは、サスペンド機能のみで、他の懸濁関数を呼び出すテール位置 することテール呼び出し、それらに。サスペンド関数や 折り返しコールバックの節に示すように、低レベルの同期プリミティブやラップコールバックを実装する関数を一時停止する典型的なケースです。これらの関数はsuspendCoroutine、末尾にあるような他の中断関数を呼び出します。これらは、通常の非停止機能と同様にコンパイルされますが、唯一の例外はCPS変換から得た暗黙の継続パラメータが 終了呼び出しの次の一時停止機能に渡されることです。
-
-> 注：現在の実装では、 - 戻り関数は、テールコールとして認識されるように、他の中断関数の呼び出しとともにUnit明示的なreturnステートメントを含める必要があります。
-
-サスペンド呼び出しが非テール位置に現れる場合、コンパイラは、対応するサスペンド機能用のステートマシンを作成し ます。中断された関数が呼び出されたときに作成され、完了すると破棄されるステートマシンオブジェクトのインスタンス。
-
-> 注：将来のバージョンでは、このコンパイル戦略を最適化して、最初の中断ポイントでのみステートマシンのインスタンスを作成することができます。
-
-このステートマシンオブジェクトは、今度は、として機能完了継続非尾位置における他の懸濁化機能の起動のために。このステートマシンオブジェクトインスタンスは、関数が他の中断関数に複数の呼び出しを行うときに更新され、再利用されます。これを他の非同期プログラミングスタイルと比較します。非同期処理の後続の各ステップでは、通常、新しく割り当てられた独立したクロージャオブジェクトを実装します。
+この状態マシンオブジェクトは、末尾以外の位置での他のサスペンド関数の呼び出しの_完了の継続_として機能します。
+この状態マシンオブジェクトインスタンスは、関数が他のサスペンド関数に対して複数の呼び出しを行うときに更新され、再使用されます。
+これを他の[非同期プログラミングスタイル](#非同期プログラミングスタイル)と比較します。非同期処理に続く各ステップは、通常、別々に新しく割り当てられたクロージャオブジェクトで実装されます。
 
 ### Coroutine intrinsics
 
-The actual implementation of `suspendCoroutine` suspending function in the standard library is written in Kotlin
-itself and its source code is available as part of the standard library sources package. In order to provide for the
-safe and problem-free use of coroutines, it wraps the actual continuation of the state machine 
-into an additional object on each suspension of coroutine. This is perfectly fine for truly asynchronous use cases
-like [asynchronous computations](#asynchronous-computations) and [futures](#futures), since the runtime costs of the 
-corresponding asynchronous primitives far outweigh the cost of an additional allocated object. However, for
-the [generators](#generators) use case this additional cost is prohibitive.
+標準ライブラリーにおける `suspendCoroutine` サスペンド関数の実際の実装はKotlin自身で書かれており、ソースコードは標準ライブラリソースパッケージの一部として利用可能です。
+コルーチンの安全で問題のない使用を提供するために、コルーチンの各中断の追加オブジェクトに状態マシンの実際の継続をラップします。
+対応する非同期プリミティブのランタイムコストは、追加で割り当てられたオブジェクトのコストをはるかに上回るため、これは[非同期計算](#非同期計算)やフューチャー(#futures)のような真の非同期ユースケースにとってはまったく問題ありません。
+しかし、ジェネレーターのユースケースでは、この追加コストは法外なものです。
 
-The `kotlin.coroutines.experimental.intrinsics` package in the standard library contains the function named `suspendCoroutineOrReturn`
-with the following signature:
-
-suspendCoroutine標準ライブラリに一時停止機能の実際の実装はKotlin自身で書かれており、そのソースコードは標準ライブラリソースパッケージの一部として利用可能です。コルーチンの安全で問題のない使用を提供するために、コルーチンの各サスペンション上の追加のオブジェクトにステートマシンの実際の継続をラップします。これは、対応する非同期プリミティブのランタイムコストが追加の割り当てオブジェクトのコストをはるかに上回るため、非同期計算や先物のような真の非同期ユースケースにとってはまったく問題ありません。しかし、発電機の使用例では、この追加コストは法外なものです。
-
-kotlin.coroutines.experimental.intrinsics標準ライブラリのパッケージには、という名前の関数が含まれsuspendCoroutineOrReturn 、次の署名とを：
+標準ライブラリの `kotlin.coroutines.experimental.intrinsics` パッケージには、以下のシグネチャを持つ `suspendCoroutineOrReturn` という名前の関数が含まれています。
 
 ```kotlin
 suspend fun <T> suspendCoroutineOrReturn(block: (Continuation<T>) -> Any?): T
 ```
 
-It provides direct access to [continuation passing style](#continuation-passing-style) of suspending functions
-and _unchecked_ reference to continuation. The user of 
-`suspendCoroutineOrReturn` bears full responsibility of following CPS result convention, but gains slightly
-better performance as a result. This convention is usually easy to follow for `buildSequence`/`yield`-like coroutines,
-but attempts to write asynchronous `await`-like suspending functions on top of `suspendCoroutineOrReturn` are
-**discouraged** as they are **extremely tricky** to implement correctly without the help of `suspendCoroutine`
-and errors in these implementation attempts are typically [heisenbugs](https://en.wikipedia.org/wiki/Heisenbug)
-that defy attempts to find and reproduce them via tests.
- 
-There are also functions called `createCoroutineUnchecked` with the following signatures:
+これはサスペンド関数の[継続渡しスタイル](#継続渡しスタイル)への直接アクセスと、継続への_未チェック_の参照を提供します。
+`suspendCoroutineOrReturn` の利用者は、以下のCPS結果規約に全面的な責任を負いますが、その結果として少し良いパフォーマンスを得ます。
+この慣習は通常 `buildSequence`/`yield` のようなコルーチンに対しては簡単にできますが、`suspendCoroutineOrReturn` の上に非同期 `await` のようなサスペンド関数を書こうとすると、`suspendCoroutine` の助けを借りずに正しく実装するのは**非常に難しい**ので**失望**しますし、これらの実装の試行でのエラーは、テストで見つけて再現しようとする試みを無視する典型的な[ハイゼンバグ](https://ja.wikipedia.org/wiki/%E7%89%B9%E7%95%B0%E3%81%AA%E3%83%90%E3%82%B0)です。
 
-サスペンド機能の継承パッシングスタイルへの直接アクセスと、継続への未確認の参照を提供します。ユーザーは、 suspendCoroutineOrReturnCPSの結果規約に従う責任を全うしますが、結果としてパフォーマンスが少し向上します。この規則は、のために従うことは、通常は簡単ですbuildSequence/ yield様コルーチンが、非同期書き込みを試みるawaitの上に機能サスペンド様suspendCoroutineOrReturnされている 落胆をそのまま非常にトリッキーなの助けを借りずに正しく実装するsuspendCoroutine これらの実装の試みで、エラー、典型的には特異なバグ 挑みますテストで見つけて再生しようとします。
-
-次のシグネチャで呼び出されるcreateCoroutineUnchecked関数もあります。
+次のシグネチャを持つ `createCoroutineUnchecked` という関数もあります。
 
 ```kotlin
 fun <T> (suspend () -> T).createCoroutineUnchecked(completion: Continuation<T>): Continuation<Unit>
 fun <R, T> (suspend R.() -> T).createCoroutineUnchecked(receiver: R, completion: Continuation<T>): Continuation<Unit>
 ```
 
-They return unchecked reference to the initial continuation (without an additional wrapper object).  
-Optimization version of `buildSequence` via `createCoroutineUnchecked` is shown below:
-それらは初期の継続への未チェックの参照を返します（追加のラッパーオブジェクトなし）。
-最適化バージョンbuildSequenceを経由しては、createCoroutineUnchecked以下の通りであります：
+それらは初期の継続への未チェックの参照を返します（追加のラッパーオブジェクトなしで）。
+`createCoroutineUnchecked` による `buildSequence` の最適化バージョンを以下に示します。
 
 ```kotlin
 fun <T> buildSequence(block: suspend SequenceBuilder<T>.() -> Unit): Sequence<T> = Sequence {
@@ -1528,13 +1436,11 @@ fun <T> buildSequence(block: suspend SequenceBuilder<T>.() -> Unit): Sequence<T>
 }
 ```
 
-Optimized version of `yield` via `suspendCoroutineOrReturn` is shown below.
-Note, that because `yield` always suspends, 
-the corresponding block always returns `COROUTINE_SUSPENDED`.
-最適化バージョンyieldを経由してはsuspendCoroutineOrReturn以下の通りです。そのため、注意してくださいyield必ず一時停止し、対応するブロックは常に返しますCOROUTINE_SUSPENDED。
+`suspendCoroutineOrReturn`による `yield` の最適化バージョンを以下に示します。
+`yield` は常に中断されるので、対応するブロックは常に `COROUTINE SUSPENDED` を返します。
 
 ```kotlin
-// Generator implementation
+// ジェネレーターの実装
 override suspend fun yield(value: T) {
     setNext(value)
     return suspendCoroutineOrReturn { cont ->
@@ -1544,16 +1450,9 @@ override suspend fun yield(value: T) {
 }
 ```
 
-> You can get full code [here](examples/sequence/buildSequenceOptimized.kt)
+> [ここ](examples/sequence/buildSequenceOptimized.kt)で完全なコードを取得できます
 
-The contents of `kotlin.coroutines.experimental.intrinsics` package are hidden from auto-completion in Kotlin 
-plugin for IDEA to protect them from accidental usage. You need to manually write the corresponding 
-import statement to get access to the above intrinsics.
-
-> ここで完全なコードを取得できます
-
-kotlin.coroutines.experimental.intrinsicsパッケージの内容は、誤って使用されるのを防ぐため、IDEAのKotlinプラグインの自動補完から隠されています。上記の組み込み関数にアクセスするには、対応するimport文を手動で記述する必要があります。
-
+`kotlin.coroutines.experimental.intrinsics` パッケージの内容は、誤って使用されるのを防ぐためIDEAのKotlinプラグインの自動補完から隠されています。上記の基礎的関数にアクセスするには、対応するimport文を手動で記述する必要があります。
  
 ## Revision history
 
